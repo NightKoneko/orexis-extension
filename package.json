@@ -1,0 +1,32 @@
+{
+  "name": "orexis-extension",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build",
+    "dev:watch": "concurrently \"npm run watch:content\" \"npm run watch:background\" \"npm run watch:injector\"",
+    "build": "npm run build:content && npm run build:background && npm run build:injector",
+    "build:content": "cross-env ENTRY=content vite build",
+    "build:background": "cross-env ENTRY=background vite build",
+    "build:injector": "cross-env ENTRY=injector vite build",
+    "watch:content": "cross-env ENTRY=content vite build --watch",
+    "watch:background": "cross-env ENTRY=background vite build --watch",
+    "watch:injector": "cross-env ENTRY=injector vite build --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "antd": "^5.22.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
