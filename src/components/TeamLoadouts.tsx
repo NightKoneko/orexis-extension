@@ -729,6 +729,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                       const character = findCharacterById(state, member.characterId)
                       const avatar = getCharacterAvatarUrl(member.characterId)
                       const name = resolveCharacterName(state, character ?? member.characterId)
+                      const isEnabled = getMemberEnabled(team.id, member)
                       return (
                         <img
                           key={`${member.characterId}-${i}`}
@@ -738,8 +739,14 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                             width: 26,
                             height: 26,
                             borderRadius: '50%',
-                            border: `1px solid ${token.colorBorderSecondary}`,
+                            border: isEnabled ? `2px solid ${token.colorPrimary}` : `2px solid ${token.colorBorderSecondary}`,
                             background: token.colorFillQuaternary,
+                            opacity: isEnabled ? 1 : 0.5,
+                            cursor: 'pointer',
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMemberEnabled(team.id, member.characterId, !isEnabled)
                           }}
                         />
                       )
@@ -929,12 +936,20 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                               <Tooltip
                                 key={`${member.characterId}-icon-${idx}`}
                                 title={
-                                  isRelicConflicted
-                                    ? `Also equipped by: ${conflictMembers
-                                        .filter(id => id !== member.characterId)
-                                        .map(id => resolveCharacterName(state, findCharacterById(state, id) ?? id))
-                                        .join(', ')}`
-                                    : relic?.set
+                                  <div style={{ maxWidth: 220 }}>
+                                    <RelicCard relic={relic} compact />
+                                    <Text style={{ fontSize: 11, display: 'block', marginTop: 6 }}>
+                                      {relic?.set ?? 'Unknown set'}
+                                    </Text>
+                                    {isRelicConflicted && (
+                                      <Text style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                                        Also equipped by: {conflictMembers
+                                          .filter(id => id !== member.characterId)
+                                          .map(id => resolveCharacterName(state, findCharacterById(state, id) ?? id))
+                                          .join(', ')}
+                                      </Text>
+                                    )}
+                                  </div>
                                 }
                               >
                                 <span style={{ position: 'relative', display: 'inline-block' }}>
