@@ -25,6 +25,22 @@ const { Text, Title } = Typography
 const PATHS = ['Abundance', 'Destruction', 'Erudition', 'Harmony', 'Hunt', 'Nihility', 'Preservation', 'Remembrance'] as const
 const ELEMENTS = ['Physical', 'Fire', 'Ice', 'Lightning', 'Wind', 'Quantum', 'Imaginary'] as const
 
+function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+function setsEqual<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  if (a.size !== b.size) return false
+  for (const value of a) {
+    if (!b.has(value)) return false
+  }
+  return true
+}
+
 function FilterIcon({ src, active, onClick, title, size = 26 }: {
   src: string
   active: boolean
@@ -153,16 +169,20 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
     const allTeams = draftTeam ? [draftTeam, ...teams] : teams
     const team = allTeams.find(t => t.id === activeTeamId)
     if (!team) return
-    setEditSelectedCharacters(new Set(team.members.map(m => m.characterId)))
-    setEditMemberOrder(team.members.map(m => m.characterId))
+    const nextSelected = new Set(team.members.map(m => m.characterId))
+    const nextOrder = team.members.map(m => m.characterId)
+    setEditSelectedCharacters(prev => (setsEqual(prev, nextSelected) ? prev : nextSelected))
+    setEditMemberOrder(prev => (arraysEqual(prev, nextOrder) ? prev : nextOrder))
   }, [isEditingMembers, teams, draftTeam, activeTeamId])
 
   useEffect(() => {
     if (!draftTeam) return
     if (activeTeamId !== draftTeam.id) return
     setIsEditingMembers(true)
-    setEditSelectedCharacters(new Set(draftTeam.members.map(m => m.characterId)))
-    setEditMemberOrder(draftTeam.members.map(m => m.characterId))
+    const nextSelected = new Set(draftTeam.members.map(m => m.characterId))
+    const nextOrder = draftTeam.members.map(m => m.characterId)
+    setEditSelectedCharacters(prev => (setsEqual(prev, nextSelected) ? prev : nextSelected))
+    setEditMemberOrder(prev => (arraysEqual(prev, nextOrder) ? prev : nextOrder))
   }, [draftTeam, activeTeamId])
 
   useEffect(() => {
@@ -178,7 +198,14 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
       const char = findCharacterById(state, m.characterId)
       return resolveCharacterName(state, char ?? m.characterId)
     })
-    setDraftTeam(prev => prev ? { ...prev, members, memberNames } : prev)
+    setDraftTeam(prev => {
+      if (!prev) return prev
+      if (arraysEqual(prev.members.map(m => m.characterId), ordered)
+        && arraysEqual(prev.memberNames, memberNames)) {
+        return prev
+      }
+      return { ...prev, members, memberNames }
+    })
   }, [draftTeam, activeTeamId, editSelectedCharacters, editMemberOrder, state])
 
   const characters = (state?.characters ?? [])
