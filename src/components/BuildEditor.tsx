@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Modal, Input, Flex, Typography, Button, Select, message, theme } from 'antd'
 import { RelicCard } from './RelicCard'
 import type { Relic, Build, OptimizerState, Character } from '../types'
@@ -36,6 +36,9 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
   const [mainStatFilter, setMainStatFilter] = useState<string | null>(null)
   const [substatFilters, setSubstatFilters] = useState<string[]>([])
   const [sortOption, setSortOption] = useState<'enhance-desc' | 'enhance-asc' | 'main-desc' | 'main-asc' | 'grade-desc'>('enhance-desc')
+  const gridRef = useRef<HTMLDivElement | null>(null)
+  const [gridSize, setGridSize] = useState({ width: 0, height: 0 })
+  const [gridScrollTop, setGridScrollTop] = useState(0)
 
   const getEquippedRelicIds = useCallback((characterData: Character | undefined) => {
     if (!characterData?.equipped) return [null, null, null, null, null, null] as (string | null)[]
@@ -279,6 +282,124 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
   }, [state, character, characterId, buildIndex, buildName, selectedRelicIds, onClose])
 
   const currentSlotRelics = filteredRelics
+  const selectedRelicId = selectedRelicIds[activeSlot]
+  const CARD_WIDTH = 160
+  const CARD_HEIGHT = 220
+  const CARD_GAP = 8
+  const GRID_PADDING = 4
+  const currentSlotItems = useMemo(() => {
+    return currentSlotRelics.map((relic, index) => {
+      const uid = getRelicUid(relic) ?? null
+      return {
+        relic,
+        uid,
+        key: uid ?? `relic-${index}`,
+      }
+    })
+  }, [currentSlotRelics])
+  const gridItems = useMemo(() => {
+    return [
+      { type: 'clear' as const, key: 'clear-slot' },
+      ...currentSlotItems.map(item => ({ type: 'relic' as const, ...item })),
+    ]
+  }, [currentSlotItems])
+  const columnCount = useMemo(() => {
+    if (gridSize.width <= 0) return 1
+    const available = gridSize.width - GRID_PADDING * 2
+    return Math.max(1, Math.floor((available + CARD_GAP) / (CARD_WIDTH + CARD_GAP)))
+  }, [gridSize.width])
+  const rowCount = useMemo(() => {
+    return Math.ceil(gridItems.length / columnCount)
+  }, [gridItems.length, columnCount])
+  const rowHeight = CARD_HEIGHT + CARD_GAP
+  const totalGridHeight = rowCount * rowHeight
+  const visibleRowCount = gridSize.height > 0 ? Math.ceil(gridSize.height / rowHeight) : 0
+  const overscanRows = 2
+  const startRow = Math.max(0, Math.floor(gridScrollTop / rowHeight) - overscanRows)
+  const endRow = Math.min(rowCount - 1, startRow + visibleRowCount + overscanRows * 2)
+
+  useEffect(() => {
+    const element = gridRef.current
+    if (!element) return
+
+    const updateSize = () => {
+      setGridSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      })
+    }
+
+    updateSize()
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  const renderGridItem = useCallback((item: (typeof gridItems)[number]) => {
+    if (item.type === 'clear') {
+      return (
+        <div
+          key={item.key}
+          onClick={() => handleSelectRelic(null)}
+          style={{
+            width: CARD_WIDTH,
+            minWidth: CARD_WIDTH,
+            height: CARD_HEIGHT,
+            border: `2px dashed ${token.colorBorderSecondary}`,
+            borderRadius: token.borderRadius,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: token.colorTextSecondary,
+            fontSize: 14,
+            transition: 'all 0.2s',
+          }}
+        >
+          Clear Slot
+        </div>
+      )
+    }
+
+    return (
+      <RelicCard
+        key={item.key}
+        relic={item.relic}
+        uid={item.uid}
+        selected={item.uid === selectedRelicId}
+        onSelect={handleSelectRelic}
+        compact
+      />
+    )
+  }, [handleSelectRelic, selectedRelicId, token])
+
+  const virtualRows = useMemo(() => {
+    if (gridSize.width <= 0 || gridSize.height <= 0) return null
+    const rows: JSX.Element[] = []
+    for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
+      const startIndex = rowIndex * columnCount
+      const items = gridItems.slice(startIndex, startIndex + columnCount)
+      rows.push(
+        <div
+          key={`row-${rowIndex}`}
+          style={{
+            position: 'absolute',
+            top: rowIndex * rowHeight,
+            left: 0,
+            right: 0,
+            height: rowHeight,
+            display: 'flex',
+            gap: CARD_GAP,
+            paddingLeft: GRID_PADDING,
+            paddingRight: GRID_PADDING,
+          }}
+        >
+          {items.map(renderGridItem)}
+        </div>
+      )
+    }
+    return rows
+  }, [CARD_GAP, GRID_PADDING, columnCount, endRow, gridItems, gridSize.height, gridSize.width, renderGridItem, rowHeight, startRow])
 
   return (
     <Modal
@@ -410,42 +531,15 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
               </Text>
             </Flex>
 
-            <Flex wrap="wrap" gap={8} style={{ maxHeight: '55vh', overflowY: 'auto', padding: 4 }}>
-              <div
-                onClick={() => handleSelectRelic(null)}
-                style={{
-                  width: 160,
-                  minWidth: 160,
-                  height: 220,
-                  border: `2px dashed ${token.colorBorderSecondary}`,
-                  borderRadius: token.borderRadius,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: token.colorTextSecondary,
-                  fontSize: 14,
-                  transition: 'all 0.2s',
-                }}
-              >
-                Clear Slot
+            <div
+              ref={gridRef}
+              onScroll={(event) => setGridScrollTop(event.currentTarget.scrollTop)}
+              style={{ height: '55vh', overflowY: 'auto' }}
+            >
+              <div style={{ position: 'relative', height: totalGridHeight }}>
+                {virtualRows}
               </div>
-
-              {currentSlotRelics.map(relic => {
-                const uid = getRelicUid(relic)
-                const isSelected = uid === selectedRelicIds[activeSlot]
-                
-                return (
-                  <RelicCard
-                    key={uid}
-                    relic={relic}
-                    selected={isSelected}
-                    onClick={() => handleSelectRelic(uid ?? null)}
-                    compact
-                  />
-                )
-              })}
-            </Flex>
+            </div>
           </div>
         </Flex>
       </Flex>

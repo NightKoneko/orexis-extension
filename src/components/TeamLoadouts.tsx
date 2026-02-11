@@ -148,6 +148,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
     refreshState()
   }, [refreshState])
 
+
   useEffect(() => {
     const allTeams = draftTeam ? [draftTeam, ...teams] : teams
     if (!allTeams.length) return
@@ -163,6 +164,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
     if (activeCharacterId && team.members.some(m => m.characterId === activeCharacterId)) return
     setActiveCharacterId(team.members[0].characterId)
   }, [activeTeamId, teams, draftTeam, activeCharacterId])
+
 
   useEffect(() => {
     if (!isEditingMembers) return
@@ -1093,7 +1095,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                                 key={`${member.characterId}-${index}`}
                                 relic={relic}
                                 compact
-                                onClick={() => {
+                                onSelect={() => {
                                   const slotIndex = getSlotIndex(relic.part)
                                   setBuildEditorCharacterId(member.characterId)
                                   setBuildEditorBuildIndex(builds.length ? buildIndex : -1)

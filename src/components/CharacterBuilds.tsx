@@ -223,7 +223,7 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
             key={`slot-${index}-${getRelicUid(relic)}`}
             relic={relic}
             compact
-            onClick={() => onRelicClick(relic)}
+            onSelect={() => onRelicClick(relic)}
           />
         )
       }

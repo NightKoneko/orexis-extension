@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Card, Divider, Flex, theme } from 'antd'
 import type { Relic } from '../types'
 import {
@@ -82,13 +83,20 @@ const StatRow = ({
 
 export interface RelicCardProps {
   relic: Relic
+  uid?: string | null
   selected?: boolean
-  onClick?: () => void
+  onSelect?: (uid: string | null) => void
   showScore?: boolean
   compact?: boolean
 }
 
-export function RelicCard({ relic, selected = false, onClick, compact = false }: RelicCardProps) {
+export const RelicCard = memo(function RelicCard({
+  relic,
+  uid = null,
+  selected = false,
+  onSelect,
+  compact = false,
+}: RelicCardProps) {
   const { token } = theme.useToken()
   const relicSrc = getRelicImageUrl(relic)
   const equippedBySrc = relic.equippedBy 
@@ -105,7 +113,7 @@ export function RelicCard({ relic, selected = false, onClick, compact = false }:
     <Card
       size="small"
       hoverable
-      onClick={onClick}
+      onClick={onSelect ? () => onSelect(uid) : undefined}
       style={{
         width: CARD_WIDTH,
         minWidth: CARD_WIDTH,
@@ -162,4 +170,4 @@ export function RelicCard({ relic, selected = false, onClick, compact = false }:
       </Flex>
     </Card>
   )
-}
+})
