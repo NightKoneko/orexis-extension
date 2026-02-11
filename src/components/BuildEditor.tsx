@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react'
 import { Modal, Input, Flex, Typography, Button, Select, message, theme } from 'antd'
 import { RelicCard } from './RelicCard'
 import type { Relic, Build, OptimizerState, Character } from '../types'
@@ -287,6 +287,14 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
   const CARD_HEIGHT = 220
   const CARD_GAP = 8
   const GRID_PADDING = 4
+  const fallbackWidth = typeof window !== 'undefined'
+    ? Math.max(300, window.innerWidth - 260)
+    : 800
+  const fallbackHeight = typeof window !== 'undefined'
+    ? Math.max(200, Math.round(window.innerHeight * 0.55))
+    : 500
+  const effectiveWidth = gridSize.width || fallbackWidth
+  const effectiveHeight = gridSize.height || fallbackHeight
   const currentSlotItems = useMemo(() => {
     return currentSlotRelics.map((relic, index) => {
       const uid = getRelicUid(relic) ?? null
@@ -304,36 +312,52 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
     ]
   }, [currentSlotItems])
   const columnCount = useMemo(() => {
-    if (gridSize.width <= 0) return 1
-    const available = gridSize.width - GRID_PADDING * 2
+    if (effectiveWidth <= 0) return 1
+    const available = effectiveWidth - GRID_PADDING * 2
     return Math.max(1, Math.floor((available + CARD_GAP) / (CARD_WIDTH + CARD_GAP)))
-  }, [gridSize.width])
+  }, [effectiveWidth])
   const rowCount = useMemo(() => {
     return Math.ceil(gridItems.length / columnCount)
   }, [gridItems.length, columnCount])
   const rowHeight = CARD_HEIGHT + CARD_GAP
   const totalGridHeight = rowCount * rowHeight
-  const visibleRowCount = gridSize.height > 0 ? Math.ceil(gridSize.height / rowHeight) : 0
+  const visibleRowCount = effectiveHeight > 0 ? Math.ceil(effectiveHeight / rowHeight) : 0
   const overscanRows = 2
   const startRow = Math.max(0, Math.floor(gridScrollTop / rowHeight) - overscanRows)
   const endRow = Math.min(rowCount - 1, startRow + visibleRowCount + overscanRows * 2)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!open) return
     const element = gridRef.current
     if (!element) return
 
+    let attempts = 0
+    let retryId: number | undefined
+
     const updateSize = () => {
-      setGridSize({
-        width: element.clientWidth,
-        height: element.clientHeight,
-      })
+      const rect = element.getBoundingClientRect()
+      const parentWidth = element.parentElement?.clientWidth ?? 0
+      const parentHeight = element.parentElement?.clientHeight ?? 0
+      const width = rect.width || element.clientWidth || parentWidth || Math.max(300, window.innerWidth - 260)
+      const height = rect.height || element.clientHeight || parentHeight || Math.max(200, Math.round(window.innerHeight * 0.55))
+
+      setGridSize({ width, height })
+
+      if ((width === 0 || height === 0) && attempts < 10) {
+        attempts += 1
+        retryId = window.setTimeout(updateSize, 50)
+      }
     }
 
-    updateSize()
+    const rafId = requestAnimationFrame(updateSize)
     const observer = new ResizeObserver(updateSize)
     observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
+    return () => {
+      cancelAnimationFrame(rafId)
+      if (retryId) window.clearTimeout(retryId)
+      observer.disconnect()
+    }
+  }, [open])
 
   const renderGridItem = useCallback((item: (typeof gridItems)[number]) => {
     if (item.type === 'clear') {
@@ -374,7 +398,7 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
   }, [handleSelectRelic, selectedRelicId, token])
 
   const virtualRows = useMemo(() => {
-    if (gridSize.width <= 0 || gridSize.height <= 0) return null
+    if (effectiveWidth <= 0 || effectiveHeight <= 0) return null
     const rows: JSX.Element[] = []
     for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
       const startIndex = rowIndex * columnCount
@@ -399,7 +423,7 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
       )
     }
     return rows
-  }, [CARD_GAP, GRID_PADDING, columnCount, endRow, gridItems, gridSize.height, gridSize.width, renderGridItem, rowHeight, startRow])
+  }, [CARD_GAP, GRID_PADDING, columnCount, effectiveHeight, effectiveWidth, endRow, gridItems, renderGridItem, rowHeight, startRow])
 
   return (
     <Modal
