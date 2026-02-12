@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { App } from './App'
+import lightConeRanks from './assets/light_cone_ranks.json'
 import {
   OREXIS_PAGE_KEY,
   STORE_WAIT_TIMEOUT,
@@ -10,6 +11,10 @@ import {
   CONTENT_SELECTORS,
   SUBMENU_SELECTOR,
 } from './constants'
+
+if (!window.__hsrLightConeRanks) {
+  window.__hsrLightConeRanks = lightConeRanks
+}
 
 function waitForStore(timeout = STORE_WAIT_TIMEOUT): Promise<void> {
   return new Promise((resolve, reject) => {

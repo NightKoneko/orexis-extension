@@ -19,11 +19,69 @@ import { applyLoadout } from '../utils/bridge'
 import { getRelicUid, getRelicImageUrl, sortRelicsBySlot, getSlotIndex } from '../utils/relics'
 import { RelicCard } from './RelicCard'
 import { BuildEditor } from './BuildEditor'
+import { getShowcaseStats, type BasicStatsObject, type SingleRelicByPart } from '../getShowcaseStats'
 
 const { Text, Title } = Typography
 
 const PATHS = ['Abundance', 'Destruction', 'Erudition', 'Harmony', 'Hunt', 'Nihility', 'Preservation', 'Remembrance'] as const
 const ELEMENTS = ['Physical', 'Fire', 'Ice', 'Lightning', 'Wind', 'Quantum', 'Imaginary'] as const
+const ELEMENT_TO_DMG_TYPE: Record<string, string> = {
+  Physical: 'Physical DMG Boost',
+  Fire: 'Fire DMG Boost',
+  Ice: 'Ice DMG Boost',
+  Lightning: 'Lightning DMG Boost',
+  Wind: 'Wind DMG Boost',
+  Quantum: 'Quantum DMG Boost',
+  Imaginary: 'Imaginary DMG Boost',
+}
+
+const SHOWCASE_STAT_KEYS = [
+  'HP',
+  'ATK',
+  'DEF',
+  'SPD',
+  'CRIT Rate',
+  'CRIT DMG',
+  'Effect Hit Rate',
+  'Effect RES',
+  'Break Effect',
+] as const
+
+const SHOWCASE_PERCENT_STATS = new Set<string>([
+  'CRIT Rate',
+  'CRIT DMG',
+  'Effect Hit Rate',
+  'Effect RES',
+  'Break Effect',
+])
+
+function formatShowcaseStat(stat: string, value: number): string {
+  if (SHOWCASE_PERCENT_STATS.has(stat)) {
+    return `${(value * 100).toFixed(1)}%`
+  }
+  if (stat === 'SPD') {
+    return value.toFixed(1)
+  }
+  return Math.round(value).toString()
+}
+
+function buildRelicsByPart(relics: Relic[]): SingleRelicByPart {
+  const byPart: SingleRelicByPart = {
+    Head: null,
+    Hands: null,
+    Body: null,
+    Feet: null,
+    PlanarSphere: null,
+    LinkRope: null,
+  }
+  for (const relic of relics) {
+    if (!relic?.part) continue
+    if (relic.part in byPart) {
+      byPart[relic.part] = relic
+    }
+  }
+  return byPart
+}
 
 function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
   if (a.length !== b.length) return false
@@ -495,6 +553,38 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
       .filter((m): m is { characterId: string; buildIndex?: number; enabled?: boolean } => !!m)
   }, [activeTeam, isEditingMembers, editMemberOrder])
 
+  const memberShowcaseStats = useMemo(() => {
+    if (!activeTeam || !state) return {} as Record<string, BasicStatsObject | null>
+
+    const statsByMember: Record<string, BasicStatsObject | null> = {}
+    for (const member of activeMembers) {
+      const character = findCharacterById(state, member.characterId)
+      if (!character) continue
+
+      const buildIndex = getMemberBuildIndex(activeTeam.id, member)
+      const build = character.builds?.[buildIndex]
+      const relicIds = getBuildRelicIds(build)
+      const finalRelicIds = relicIds.length ? relicIds : getEquippedRelicIds(character)
+      const relics = sortRelicsBySlot(finalRelicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null))
+      const displayRelics = buildRelicsByPart(relics)
+
+      const element = characterMetaMap[member.characterId]?.element as string | undefined
+      const elementalDmgType = element ? ELEMENT_TO_DMG_TYPE[element] : undefined
+      if (!elementalDmgType) {
+        statsByMember[member.characterId] = null
+        continue
+      }
+
+      try {
+        statsByMember[member.characterId] = getShowcaseStats(character, displayRelics, { elementalDmgType })
+      } catch {
+        statsByMember[member.characterId] = null
+      }
+    }
+
+    return statsByMember
+  }, [activeTeam, activeMembers, characterMetaMap, state])
+
   const closeBuildEditor = () => {
     setBuildEditorOpen(false)
     setBuildEditorCharacterId(null)
@@ -851,6 +941,15 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                 const avatar = getCharacterAvatarUrl(member.characterId)
                 const charName = resolveCharacterName(state, character)
                 const isConflicted = activeConflict.conflictedMembers.has(member.characterId)
+                const showcaseStats = memberShowcaseStats[member.characterId] ?? null
+                const showcaseSummary = showcaseStats
+                  ? SHOWCASE_STAT_KEYS
+                    .map((stat) => {
+                      const value = showcaseStats[stat] ?? 0
+                      return `${stat}: ${formatShowcaseStat(stat, value)}`
+                    })
+                    .join(' · ')
+                  : ''
 
                 const build = builds[buildIndex]
                 const relicIds = getBuildRelicIds(build)
@@ -921,6 +1020,11 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                             </Tooltip>
                           )}
                         </Flex>
+                        {showcaseSummary && (
+                          <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
+                            {showcaseSummary}
+                          </Text>
+                        )}
                         <Text style={{ fontSize: 12, color: token.colorTextSecondary }}>
                           {finalRelicIds.length} relics · {build?.name ?? 'Equipped'}
                         </Text>

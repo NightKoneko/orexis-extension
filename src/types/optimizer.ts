@@ -86,6 +86,9 @@ declare global {
       getFixedT: (lng: string | null, ns: string) => (key: string) => string
       resolvedLanguage?: string
     }
+    __hsrLightConeRanks?: Record<string, {
+      properties?: Array<Array<{ type?: string; value?: number }>>
+    }>
     SaveState?: {
       save: () => void
       load: (notify?: boolean, force?: boolean) => void

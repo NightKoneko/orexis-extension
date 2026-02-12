@@ -21,4 +21,10 @@ export interface Relic {
   equippedBy?: string
   verified?: boolean
   initialRolls?: number
+  augmentedStats: AugmentedStats, // optimiser + relicsGrid cv getter
+}
+
+export type AugmentedStats = Record<string, number> & {
+  mainStat: string,
+  mainValue: number,
 }
