@@ -171,6 +171,11 @@ function normalizeRelicValue(stat: string, value: number): number {
   return isPercentStat(stat) ? value / 100 : value
 }
 
+function normalizeAugmentedValue(stat: string, value: number): number {
+  if (!isPercentStat(stat)) return value
+  return value > 1 ? value / 100 : value
+}
+
 function applyBonus(target: StatMap, bonus?: Partial<StatMap>) {
   if (!bonus) return
   for (const [key, value] of Object.entries(bonus)) {
@@ -221,8 +226,102 @@ const LIGHT_CONE_PROP_TO_STAT: Record<string, StatKey | 'ELEMENTAL_DMG'> = {
   AllDamageTypeAddedRatio: 'ELEMENTAL_DMG',
 }
 
+function resolveStatKey(stat: string): StatKey | null {
+  if (STAT_KEYS.includes(stat as StatKey)) return stat as StatKey
+  const mapped = LIGHT_CONE_PROP_TO_STAT[stat]
+  if (mapped && mapped !== 'ELEMENTAL_DMG') return mapped as StatKey
+  return null
+}
+
 function sumDirect(base: StatMap, lc: StatMap, relics: StatMap, sets: StatMap, stat: StatKey): number {
   return (base[stat] || 0) + (lc[stat] || 0) + (relics[stat] || 0) + (sets[stat] || 0)
+}
+
+function addTraceStats(
+  target: StatMap,
+  form: Record<string, unknown>,
+  metadata: Record<string, unknown>,
+  characterId: string,
+) {
+  const formAny = form as Record<string, unknown>
+  const metaAny = metadata as Record<string, unknown>
+  const traceBoosts =
+    (formAny.statBoosts as unknown[]) ??
+    (formAny.traceStatBoosts as unknown[]) ??
+    (formAny.traceBoosts as unknown[]) ??
+    (formAny.traces as unknown[]) ??
+    (formAny.trace as unknown[])
+
+  const metaCharacter = (metaAny.characters as Record<string, unknown> | undefined)?.[characterId] as Record<string, unknown> | undefined
+  if (!Array.isArray(traceBoosts) || traceBoosts.length === 0) {
+    const traces = metaCharacter?.traces as Record<string, number> | undefined
+    if (traces) {
+      for (const [stat, value] of Object.entries(traces)) {
+        if (typeof value !== 'number') continue
+        const statKey = resolveStatKey(stat)
+        if (!statKey) continue
+        addStat(target, statKey, normalizeAugmentedValue(statKey, value))
+      }
+      return
+    }
+
+    const traceTree = metaCharacter?.traceTree as Array<Record<string, unknown>> | undefined
+    if (Array.isArray(traceTree)) {
+      for (const node of traceTree) {
+        const rawStat = node?.stat as string | undefined
+        const rawValue = node?.value
+        if (!rawStat || typeof rawValue !== 'number') continue
+        const statKey = resolveStatKey(rawStat)
+        if (!statKey) continue
+        addStat(target, statKey, normalizeAugmentedValue(statKey, rawValue))
+      }
+    }
+    return
+  }
+  const sources = [
+    metaAny.statBoosts,
+    metaAny.characterStatBoosts,
+    metaAny.statBoostsById,
+    metaAny.traceStats,
+    metaCharacter?.statBoosts,
+    metaCharacter?.traceStats,
+  ]
+
+  const resolveFromSources = (id: string | number) => {
+    for (const source of sources) {
+      if (!source) continue
+      if (Array.isArray(source) && typeof id === 'number' && source[id]) return source[id]
+      if (typeof source === 'object' && source !== null && id in (source as Record<string, unknown>)) {
+        return (source as Record<string, unknown>)[String(id)]
+      }
+    }
+    return null
+  }
+
+  const addEntry = (entry: Record<string, unknown>) => {
+    const stats = entry.stats as Array<Record<string, unknown>> | undefined
+    if (Array.isArray(stats)) {
+      for (const statEntry of stats) addEntry(statEntry)
+      return
+    }
+
+    const rawStat = (entry.stat ?? entry.type) as string | undefined
+    const rawValue = entry.value
+    if (!rawStat || typeof rawValue !== 'number') return
+    const statKey = resolveStatKey(rawStat)
+    if (!statKey) return
+    addStat(target, statKey, normalizeAugmentedValue(statKey, rawValue))
+  }
+
+  for (const boost of traceBoosts) {
+    if (boost == null) continue
+    if (typeof boost === 'string' || typeof boost === 'number') {
+      const entry = resolveFromSources(boost)
+      if (entry && typeof entry === 'object') addEntry(entry as Record<string, unknown>)
+      continue
+    }
+    if (typeof boost === 'object') addEntry(boost as Record<string, unknown>)
+  }
 }
 
 export function getShowcaseStats(
@@ -291,6 +390,7 @@ export function getShowcaseStats(
   }
 
   const relicStats = createZeroStats()
+  const traceStats = createZeroStats()
 
   for (const relic of Object.values(displayRelics)) {
     if (!relic) continue
@@ -299,7 +399,13 @@ export function getShowcaseStats(
       for (const [key, value] of Object.entries(relic.augmentedStats)) {
         if (key === 'mainStat' || key === 'mainValue') continue
         if (typeof value !== 'number') continue
-        addStat(relicStats, key, value)
+        addStat(relicStats, key, normalizeAugmentedValue(key, value))
+      }
+
+      const mainStat = relic.augmentedStats.mainStat ?? relic.main?.stat
+      const mainValue = relic.augmentedStats.mainValue ?? relic.main?.value
+      if (mainStat && typeof mainValue === 'number') {
+        addStat(relicStats, mainStat, normalizeAugmentedValue(mainStat, mainValue))
       }
       continue
     }
@@ -346,6 +452,8 @@ export function getShowcaseStats(
     applyBonus(setBonusStats, ORNAMENT_SET_BONUSES[planarSet])
   }
 
+  addTraceStats(traceStats, form, metadata as Record<string, unknown>, characterId)
+
   const finalStats: BasicStatsObject = {
     ...createZeroStats(),
     ELEMENTAL_DMG: 0,
@@ -356,20 +464,20 @@ export function getShowcaseStats(
   const baseDEF = (baseStats.DEF || 0) + (lcStats.DEF || 0)
   const baseSPD = (baseStats.SPD || 0) + (lcStats.SPD || 0)
 
-  finalStats['HP%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'HP%')
-  finalStats['ATK%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'ATK%')
-  finalStats['DEF%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'DEF%')
-  finalStats['SPD%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'SPD%')
+  finalStats['HP%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'HP%') + (traceStats['HP%'] || 0)
+  finalStats['ATK%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'ATK%') + (traceStats['ATK%'] || 0)
+  finalStats['DEF%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'DEF%') + (traceStats['DEF%'] || 0)
+  finalStats['SPD%'] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, 'SPD%') + (traceStats['SPD%'] || 0)
 
-  finalStats.HP = baseHP * (1 + finalStats['HP%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'HP')
-  finalStats.ATK = baseATK * (1 + finalStats['ATK%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'ATK')
-  finalStats.DEF = baseDEF * (1 + finalStats['DEF%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'DEF')
-  finalStats.SPD = baseSPD * (1 + finalStats['SPD%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'SPD')
+  finalStats.HP = baseHP * (1 + finalStats['HP%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'HP') + (traceStats.HP || 0)
+  finalStats.ATK = baseATK * (1 + finalStats['ATK%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'ATK') + (traceStats.ATK || 0)
+  finalStats.DEF = baseDEF * (1 + finalStats['DEF%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'DEF') + (traceStats.DEF || 0)
+  finalStats.SPD = baseSPD * (1 + finalStats['SPD%']) + sumDirect(createZeroStats(), createZeroStats(), relicStats, setBonusStats, 'SPD') + (traceStats.SPD || 0)
 
   for (const key of STAT_KEYS) {
     if (key === 'HP%' || key === 'ATK%' || key === 'DEF%' || key === 'SPD%') continue
     if (key === 'HP' || key === 'ATK' || key === 'DEF' || key === 'SPD') continue
-    finalStats[key] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, key)
+    finalStats[key] = sumDirect(baseStats, lcStats, relicStats, setBonusStats, key) + (traceStats[key] || 0)
   }
 
   finalStats.ELEMENTAL_DMG = finalStats[showcaseMetadata.elementalDmgType as StatKey] || 0

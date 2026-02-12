@@ -14,6 +14,7 @@ import {
   getBlankUrl,
   getPathIconUrl,
   getElementIconUrl,
+  getStatIconUrl,
 } from '../site-api'
 import { applyLoadout } from '../utils/bridge'
 import { getRelicUid, getRelicImageUrl, sortRelicsBySlot, getSlotIndex } from '../utils/relics'
@@ -57,7 +58,7 @@ const SHOWCASE_PERCENT_STATS = new Set<string>([
 
 function formatShowcaseStat(stat: string, value: number): string {
   if (SHOWCASE_PERCENT_STATS.has(stat)) {
-    return `${(value * 100).toFixed(1)}%`
+    return `${(value * 100).toFixed(2)}%`
   }
   if (stat === 'SPD') {
     return value.toFixed(1)
@@ -583,7 +584,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
     }
 
     return statsByMember
-  }, [activeTeam, activeMembers, characterMetaMap, state])
+  }, [activeTeam, activeMembers, characterMetaMap, state, memberBuildSelections])
 
   const closeBuildEditor = () => {
     setBuildEditorOpen(false)
@@ -941,15 +942,17 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                 const avatar = getCharacterAvatarUrl(member.characterId)
                 const charName = resolveCharacterName(state, character)
                 const isConflicted = activeConflict.conflictedMembers.has(member.characterId)
+                const element = characterMetaMap[member.characterId]?.element as string | undefined
+                const elementalDmgType = element ? ELEMENT_TO_DMG_TYPE[element] : undefined
                 const showcaseStats = memberShowcaseStats[member.characterId] ?? null
-                const showcaseSummary = showcaseStats
-                  ? SHOWCASE_STAT_KEYS
-                    .map((stat) => {
-                      const value = showcaseStats[stat] ?? 0
-                      return `${stat}: ${formatShowcaseStat(stat, value)}`
-                    })
-                    .join(' · ')
-                  : ''
+                const scoringStats = (characterMetaMap[member.characterId]?.scoringMetadata as { stats?: Record<string, number> } | undefined)?.stats
+                const showcaseItems = showcaseStats
+                  ? SHOWCASE_STAT_KEYS.map((stat) => ({
+                    stat,
+                    value: formatShowcaseStat(stat, showcaseStats[stat] ?? 0),
+                    highlight: (scoringStats?.[stat] ?? 0) > 0,
+                  }))
+                  : []
 
                 const build = builds[buildIndex]
                 const relicIds = getBuildRelicIds(build)
@@ -973,6 +976,25 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                     })
                   }
                 })
+
+                const getBuildPreview = (previewIndex: number) => {
+                  const previewBuild = builds[previewIndex]
+                  const previewRelicIds = getBuildRelicIds(previewBuild)
+                  const previewFinalRelicIds = previewRelicIds.length ? previewRelicIds : getEquippedRelicIds(character)
+                  const previewRelics = sortRelicsBySlot(
+                    previewFinalRelicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null),
+                  )
+                  const previewRelicsByPart = buildRelicsByPart(previewRelics)
+                  let previewStats: BasicStatsObject | null = null
+                  if (elementalDmgType) {
+                    try {
+                      previewStats = getShowcaseStats(character, previewRelicsByPart, { elementalDmgType })
+                    } catch {
+                      previewStats = null
+                    }
+                  }
+                  return { previewRelics, previewStats }
+                }
 
                 return (
                   <Flex
@@ -1020,9 +1042,36 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                             </Tooltip>
                           )}
                         </Flex>
-                        {showcaseSummary && (
+                        {showcaseItems.length > 0 && (
                           <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
-                            {showcaseSummary}
+                            <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center' }}>
+                              {showcaseItems.map((item, idx) => (
+                                <span
+                                  key={item.stat}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    marginRight: idx < showcaseItems.length - 1 ? 6 : 0,
+                                    color: item.highlight ? '#d4af37' : undefined,
+                                  }}
+                                >
+                                  <img
+                                    src={getStatIconUrl(item.stat)}
+                                    alt={item.stat}
+                                    title={item.stat}
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      opacity: 0.85,
+                                      filter: item.highlight ? 'brightness(1.05) sepia(1) hue-rotate(10deg) saturate(4)' : undefined,
+                                    }}
+                                  />
+                                  <span>{item.value}</span>
+                                  {idx < showcaseItems.length - 1 && <span>·</span>}
+                                </span>
+                              ))}
+                            </span>
                           </Text>
                         )}
                         <Text style={{ fontSize: 12, color: token.colorTextSecondary }}>
@@ -1104,8 +1153,78 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                           ? builds.map((b, i) => ({
                             label: b.name ? b.name : `Build ${i + 1}`,
                             value: i,
+                            previewIndex: i,
                           }))
                           : [{ label: 'Equipped', value: -1 }]}
+                        optionRender={(option) => {
+                          const previewIndex = (option.data as { previewIndex?: number } | undefined)?.previewIndex
+                          if (typeof previewIndex !== 'number') return <span>{option.label}</span>
+
+                          const { previewRelics, previewStats } = getBuildPreview(previewIndex)
+                          const previewItems = previewStats
+                            ? SHOWCASE_STAT_KEYS.map((stat) => ({
+                              stat,
+                              value: formatShowcaseStat(stat, previewStats?.[stat] ?? 0),
+                              highlight: (scoringStats?.[stat] ?? 0) > 0,
+                            }))
+                            : []
+
+                          return (
+                            <Tooltip
+                              placement="right"
+                              title={
+                                <div style={{ maxWidth: 240 }}>
+                                  <Flex wrap="wrap" gap={4} style={{ marginBottom: 6 }}>
+                                    {previewRelics.map((relic, idx) => (
+                                      <img
+                                        key={`${relic.uid ?? relic.id ?? idx}`}
+                                        src={getRelicImageUrl(relic)}
+                                        style={{ width: 18, height: 18, borderRadius: 3, border: `1px solid ${token.colorBorderSecondary}` }}
+                                      />
+                                    ))}
+                                  </Flex>
+                                  {previewItems.length > 0 ? (
+                                    <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
+                                      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        {previewItems.map((item, idx) => (
+                                          <span
+                                            key={item.stat}
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: 4,
+                                              marginRight: idx < previewItems.length - 1 ? 6 : 0,
+                                              color: item.highlight ? '#d4af37' : undefined,
+                                            }}
+                                          >
+                                            <img
+                                              src={getStatIconUrl(item.stat)}
+                                              alt={item.stat}
+                                              style={{
+                                                width: 11,
+                                                height: 11,
+                                                opacity: 0.85,
+                                                filter: item.highlight ? 'brightness(1.05) sepia(1) hue-rotate(10deg) saturate(4)' : undefined,
+                                              }}
+                                            />
+                                            <span>{item.value}</span>
+                                            {idx < previewItems.length - 1 && <span>·</span>}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    </Text>
+                                  ) : (
+                                    <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
+                                      Stats unavailable
+                                    </Text>
+                                  )}
+                                </div>
+                              }
+                            >
+                              <span>{option.label}</span>
+                            </Tooltip>
+                          )
+                        }}
                         onChange={(value) => setMemberBuildIndex(activeTeam.id, member.characterId, value)}
                       />
                       <Button
