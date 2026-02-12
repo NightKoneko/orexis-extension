@@ -764,93 +764,95 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
             </Flex>
           </Flex>
 
-          <Flex vertical gap={8}>
-            {filteredTeams.length === 0 && teams.length > 0 && (
-              <Flex justify="center" style={{ padding: 24 }}>
-                <Text style={{ color: token.colorTextSecondary }}>
-                  No teams match "{searchQuery}"
-                </Text>
-              </Flex>
-            )}
+          <div style={{ maxHeight: 320, overflowY: 'auto', paddingRight: 4, marginRight: -4 }}>
+            <Flex vertical gap={8}>
+              {filteredTeams.length === 0 && teams.length > 0 && (
+                <Flex justify="center" style={{ padding: 24 }}>
+                  <Text style={{ color: token.colorTextSecondary }}>
+                    No teams match "{searchQuery}"
+                  </Text>
+                </Flex>
+              )}
 
-            {teams.length === 0 && (
-              <Flex vertical align="center" style={{ padding: 24 }} gap={10}>
-                <TeamOutlined style={{ fontSize: 36, color: token.colorTextTertiary }} />
-                <Title level={5} style={{ margin: 0 }}>No Team Loadouts</Title>
-                <Text style={{ color: token.colorTextSecondary, textAlign: 'center' }}>
-                  Create a team to quickly apply<br />multiple character loadouts at once
-                </Text>
-              </Flex>
-            )}
+              {teams.length === 0 && (
+                <Flex vertical align="center" style={{ padding: 24 }} gap={10}>
+                  <TeamOutlined style={{ fontSize: 36, color: token.colorTextTertiary }} />
+                  <Title level={5} style={{ margin: 0 }}>No Team Loadouts</Title>
+                  <Text style={{ color: token.colorTextSecondary, textAlign: 'center' }}>
+                    Create a team to quickly apply<br />multiple character loadouts at once
+                  </Text>
+                </Flex>
+              )}
 
-            {filteredTeams.map(team => {
-              const isSelected = selectedTeamIds.has(team.id)
-              const isActive = activeTeamId === team.id
-              const isDraft = team.id.startsWith('draft_')
-              return (
-                <div
-                  key={team.id}
-                  onClick={() => setActiveTeamId(team.id)}
-                  style={{
-                    padding: 10,
-                    borderRadius: 6,
-                    background: isActive ? token.colorPrimaryBg : token.colorBgContainer,
-                    border: isActive ? `1px solid ${token.colorPrimaryBorder}` : `1px solid ${token.colorBorderSecondary}`,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Flex justify="space-between" align="center" style={{ marginBottom: 6 }}>
-                    <Flex align="center" gap={8}>
-                      <Checkbox
-                        checked={isSelected}
-                        disabled={isDraft}
-                        onChange={e => { e.stopPropagation(); handleTeamSelect(team.id, e.target.checked) }}
-                      />
-                      <Text strong>{team.name}</Text>
-                      {isDraft && (
-                        <Tag style={{ margin: 0 }} color="warning">Draft</Tag>
-                      )}
-                    </Flex>
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={e => { e.stopPropagation(); handleDeleteTeam(team.id, team.name) }}
-                    />
-                  </Flex>
-                  <Flex wrap="wrap" gap={6}>
-                    {team.members.map((member, i) => {
-                      const character = findCharacterById(state, member.characterId)
-                      const avatar = getCharacterAvatarUrl(member.characterId)
-                      const name = resolveCharacterName(state, character ?? member.characterId)
-                      const isEnabled = getMemberEnabled(team.id, member)
-                      return (
-                        <img
-                          key={`${member.characterId}-${i}`}
-                          src={avatar}
-                          title={name}
-                          style={{
-                            width: 26,
-                            height: 26,
-                            borderRadius: '50%',
-                            border: isEnabled ? `2px solid ${token.colorPrimary}` : `2px solid ${token.colorBorderSecondary}`,
-                            background: token.colorFillQuaternary,
-                            opacity: isEnabled ? 1 : 0.5,
-                            cursor: 'pointer',
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setMemberEnabled(team.id, member.characterId, !isEnabled)
-                          }}
+              {filteredTeams.map(team => {
+                const isSelected = selectedTeamIds.has(team.id)
+                const isActive = activeTeamId === team.id
+                const isDraft = team.id.startsWith('draft_')
+                return (
+                  <div
+                    key={team.id}
+                    onClick={() => setActiveTeamId(team.id)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 6,
+                      background: isActive ? token.colorPrimaryBg : token.colorBgContainer,
+                      border: isActive ? `1px solid ${token.colorPrimaryBorder}` : `1px solid ${token.colorBorderSecondary}`,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Flex justify="space-between" align="center" style={{ marginBottom: 6 }}>
+                      <Flex align="center" gap={8}>
+                        <Checkbox
+                          checked={isSelected}
+                          disabled={isDraft}
+                          onChange={e => { e.stopPropagation(); handleTeamSelect(team.id, e.target.checked) }}
                         />
-                      )
-                    })}
-                  </Flex>
-                </div>
-              )
-            })}
-          </Flex>
+                        <Text strong>{team.name}</Text>
+                        {isDraft && (
+                          <Tag style={{ margin: 0 }} color="warning">Draft</Tag>
+                        )}
+                      </Flex>
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={e => { e.stopPropagation(); handleDeleteTeam(team.id, team.name) }}
+                      />
+                    </Flex>
+                    <Flex wrap="wrap" gap={6}>
+                      {team.members.map((member, i) => {
+                        const character = findCharacterById(state, member.characterId)
+                        const avatar = getCharacterAvatarUrl(member.characterId)
+                        const name = resolveCharacterName(state, character ?? member.characterId)
+                        const isEnabled = getMemberEnabled(team.id, member)
+                        return (
+                          <img
+                            key={`${member.characterId}-${i}`}
+                            src={avatar}
+                            title={name}
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              border: isEnabled ? `2px solid ${token.colorPrimary}` : `2px solid ${token.colorBorderSecondary}`,
+                              background: token.colorFillQuaternary,
+                              opacity: isEnabled ? 1 : 0.5,
+                              cursor: 'pointer',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setMemberEnabled(team.id, member.characterId, !isEnabled)
+                            }}
+                          />
+                        )
+                      })}
+                    </Flex>
+                  </div>
+                )
+              })}
+            </Flex>
+          </div>
 
           <Divider style={{ margin: '4px 0' }} />
 
@@ -933,75 +935,76 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
               </Card>
             )}
 
-            <Flex vertical gap={10}>
-              {activeMembers.map((member, memberIndex) => {
-                const character = findCharacterById(state, member.characterId)
-                if (!character) return null
+            <div style={{ maxHeight: 360, overflowY: 'auto', paddingRight: 4, marginRight: -4 }}>
+              <Flex vertical gap={10}>
+                {activeMembers.map((member, memberIndex) => {
+                  const character = findCharacterById(state, member.characterId)
+                  if (!character) return null
 
-                const enabled = getMemberEnabled(activeTeam.id, member)
-                const buildIndex = getMemberBuildIndex(activeTeam.id, member)
-                const builds = character.builds ?? []
-                const avatar = getCharacterAvatarUrl(member.characterId)
-                const charName = resolveCharacterName(state, character)
-                const isConflicted = activeConflict.conflictedMembers.has(member.characterId)
-                const lightConeId = (character.form as Record<string, unknown> | undefined)?.lightCone as string | undefined
-                const lightConeMeta = lightConeId ? getLightConeMeta(lightConeId) : null
-                const lightConeName = (lightConeMeta?.name ?? lightConeMeta?.longName ?? lightConeMeta?.displayName ?? lightConeId ?? 'Light Cone') as string
-                const element = characterMetaMap[member.characterId]?.element as string | undefined
-                const elementalDmgType = element ? ELEMENT_TO_DMG_TYPE[element] : undefined
-                const showcaseStats = memberShowcaseStats[member.characterId] ?? null
-                const scoringStats = (characterMetaMap[member.characterId]?.scoringMetadata as { stats?: Record<string, number> } | undefined)?.stats
-                const showcaseItems = showcaseStats
-                  ? SHOWCASE_STAT_KEYS.map((stat) => ({
-                    stat,
-                    value: formatShowcaseStat(stat, showcaseStats[stat] ?? 0),
-                    highlight: (scoringStats?.[stat] ?? 0) > 0,
-                  }))
-                  : []
+                  const enabled = getMemberEnabled(activeTeam.id, member)
+                  const buildIndex = getMemberBuildIndex(activeTeam.id, member)
+                  const builds = character.builds ?? []
+                  const avatar = getCharacterAvatarUrl(member.characterId)
+                  const charName = resolveCharacterName(state, character)
+                  const isConflicted = activeConflict.conflictedMembers.has(member.characterId)
+                  const lightConeId = (character.form as Record<string, unknown> | undefined)?.lightCone as string | undefined
+                  const lightConeMeta = lightConeId ? getLightConeMeta(lightConeId) : null
+                  const lightConeName = (lightConeMeta?.name ?? lightConeMeta?.longName ?? lightConeMeta?.displayName ?? lightConeId ?? 'Light Cone') as string
+                  const element = characterMetaMap[member.characterId]?.element as string | undefined
+                  const elementalDmgType = element ? ELEMENT_TO_DMG_TYPE[element] : undefined
+                  const showcaseStats = memberShowcaseStats[member.characterId] ?? null
+                  const scoringStats = (characterMetaMap[member.characterId]?.scoringMetadata as { stats?: Record<string, number> } | undefined)?.stats
+                  const showcaseItems = showcaseStats
+                    ? SHOWCASE_STAT_KEYS.map((stat) => ({
+                      stat,
+                      value: formatShowcaseStat(stat, showcaseStats[stat] ?? 0),
+                      highlight: (scoringStats?.[stat] ?? 0) > 0,
+                    }))
+                    : []
 
-                const build = builds[buildIndex]
-                const relicIds = getBuildRelicIds(build)
-                const finalRelicIds = relicIds.length ? relicIds : getEquippedRelicIds(character)
-                const relics = sortRelicsBySlot(finalRelicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null))
-                const isActiveChar = activeCharacterId === member.characterId
-                const setCounts: Record<string, number> = {}
-                relics.forEach(r => {
-                  if (!r?.set) return
-                  setCounts[r.set] = (setCounts[r.set] ?? 0) + 1
-                })
-                const setSummary = Object.entries(setCounts)
-                  .filter(([, count]) => count >= 2)
-                  .map(([set, count]) => `${count}pc ${set}`)
-                  .join(' · ')
-                const conflictOthers = new Set<string>()
-                Object.entries(activeConflict.conflictMap).forEach(([, members]) => {
-                  if (members.includes(member.characterId)) {
-                    members.forEach(m => {
-                      if (m !== member.characterId) conflictOthers.add(m)
-                    })
-                  }
-                })
-
-                const getBuildPreview = (previewIndex: number) => {
-                  const previewBuild = builds[previewIndex]
-                  const previewRelicIds = getBuildRelicIds(previewBuild)
-                  const previewFinalRelicIds = previewRelicIds.length ? previewRelicIds : getEquippedRelicIds(character)
-                  const previewRelics = sortRelicsBySlot(
-                    previewFinalRelicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null),
-                  )
-                  const previewRelicsByPart = buildRelicsByPart(previewRelics)
-                  let previewStats: BasicStatsObject | null = null
-                  if (elementalDmgType) {
-                    try {
-                      previewStats = getShowcaseStats(character, previewRelicsByPart, { elementalDmgType })
-                    } catch {
-                      previewStats = null
+                  const build = builds[buildIndex]
+                  const relicIds = getBuildRelicIds(build)
+                  const finalRelicIds = relicIds.length ? relicIds : getEquippedRelicIds(character)
+                  const relics = sortRelicsBySlot(finalRelicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null))
+                  const isActiveChar = activeCharacterId === member.characterId
+                  const setCounts: Record<string, number> = {}
+                  relics.forEach(r => {
+                    if (!r?.set) return
+                    setCounts[r.set] = (setCounts[r.set] ?? 0) + 1
+                  })
+                  const setSummary = Object.entries(setCounts)
+                    .filter(([, count]) => count >= 2)
+                    .map(([set, count]) => `${count}pc ${set}`)
+                    .join(' · ')
+                  const conflictOthers = new Set<string>()
+                  Object.entries(activeConflict.conflictMap).forEach(([, members]) => {
+                    if (members.includes(member.characterId)) {
+                      members.forEach(m => {
+                        if (m !== member.characterId) conflictOthers.add(m)
+                      })
                     }
-                  }
-                  return { previewRelics, previewStats }
-                }
+                  })
 
-                return (
+                  const getBuildPreview = (previewIndex: number) => {
+                    const previewBuild = builds[previewIndex]
+                    const previewRelicIds = getBuildRelicIds(previewBuild)
+                    const previewFinalRelicIds = previewRelicIds.length ? previewRelicIds : getEquippedRelicIds(character)
+                    const previewRelics = sortRelicsBySlot(
+                      previewFinalRelicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null),
+                    )
+                    const previewRelicsByPart = buildRelicsByPart(previewRelics)
+                    let previewStats: BasicStatsObject | null = null
+                    if (elementalDmgType) {
+                      try {
+                        previewStats = getShowcaseStats(character, previewRelicsByPart, { elementalDmgType })
+                      } catch {
+                        previewStats = null
+                      }
+                    }
+                    return { previewRelics, previewStats }
+                  }
+
+                  return (
                   <Flex
                     key={member.characterId}
                     align="center"
@@ -1016,15 +1019,24 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                     onClick={() => setActiveCharacterId(member.characterId)}
                   >
                     <Flex align="center" gap={10} style={{ flex: 1 }}>
-                      <Checkbox
-                        checked={enabled}
-                        onChange={e => setMemberEnabled(activeTeam.id, member.characterId, e.target.checked)}
-                      />
-                      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-                        <img
-                          src={avatar}
-                          style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${token.colorBorderSecondary}` }}
-                        />
+                      <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                          <img
+                            src={avatar}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setMemberEnabled(activeTeam.id, member.characterId, !enabled)
+                            }}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: '50%',
+                              border: `2px solid ${enabled ? token.colorPrimary : token.colorBorderSecondary}`,
+                              opacity: enabled ? 1 : 0.5,
+                              cursor: 'pointer',
+                            }}
+                          />
+                        </span>
                         {lightConeId && (
                           <Tooltip title={lightConeName}>
                             <img
@@ -1306,10 +1318,12 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                       )}
                     </Flex>
                   </Flex>
-                )
-              })}
+                  )
+                })}
 
-              <Divider style={{ margin: '4px 0' }} />
+                <Divider style={{ margin: '4px 0' }} />
+              </Flex>
+            </div>
 
               <Flex vertical gap={8}>
                 {activeCharacterId && (() => {
@@ -1379,7 +1393,6 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                 })()}
               </Flex>
             </Flex>
-          </Flex>
           )}
         </Flex>
       </Card>
