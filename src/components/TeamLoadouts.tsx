@@ -15,6 +15,8 @@ import {
   getPathIconUrl,
   getElementIconUrl,
   getStatIconUrl,
+  getLightConeIconUrl,
+  getLightConeMeta,
 } from '../site-api'
 import { applyLoadout } from '../utils/bridge'
 import { getRelicUid, getRelicImageUrl, sortRelicsBySlot, getSlotIndex } from '../utils/relics'
@@ -942,6 +944,9 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                 const avatar = getCharacterAvatarUrl(member.characterId)
                 const charName = resolveCharacterName(state, character)
                 const isConflicted = activeConflict.conflictedMembers.has(member.characterId)
+                const lightConeId = (character.form as Record<string, unknown> | undefined)?.lightCone as string | undefined
+                const lightConeMeta = lightConeId ? getLightConeMeta(lightConeId) : null
+                const lightConeName = (lightConeMeta?.name ?? lightConeMeta?.longName ?? lightConeMeta?.displayName ?? lightConeId ?? 'Light Cone') as string
                 const element = characterMetaMap[member.characterId]?.element as string | undefined
                 const elementalDmgType = element ? ELEMENT_TO_DMG_TYPE[element] : undefined
                 const showcaseStats = memberShowcaseStats[member.characterId] ?? null
@@ -1015,10 +1020,20 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                         checked={enabled}
                         onChange={e => setMemberEnabled(activeTeam.id, member.characterId, e.target.checked)}
                       />
-                      <img
-                        src={avatar}
-                        style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${token.colorBorderSecondary}` }}
-                      />
+                      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                        <img
+                          src={avatar}
+                          style={{ width: 32, height: 32, borderRadius: '50%', border: `1px solid ${token.colorBorderSecondary}` }}
+                        />
+                        {lightConeId && (
+                          <Tooltip title={lightConeName}>
+                            <img
+                              src={getLightConeIconUrl(lightConeId)}
+                              style={{ height: 75, width: 'auto', marginLeft: 6, borderRadius: 3, border: `1px solid ${token.colorBorderSecondary}` }}
+                            />
+                          </Tooltip>
+                        )}
+                      </span>
                       <Flex vertical>
                         <Flex align="center" gap={6}>
                           <Text strong>{charName}</Text>
@@ -1173,51 +1188,59 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                             <Tooltip
                               placement="right"
                               title={
-                                <div style={{ maxWidth: 240 }}>
-                                  <Flex wrap="wrap" gap={4} style={{ marginBottom: 6 }}>
-                                    {previewRelics.map((relic, idx) => (
-                                      <img
-                                        key={`${relic.uid ?? relic.id ?? idx}`}
-                                        src={getRelicImageUrl(relic)}
-                                        style={{ width: 18, height: 18, borderRadius: 3, border: `1px solid ${token.colorBorderSecondary}` }}
-                                      />
-                                    ))}
-                                  </Flex>
-                                  {previewItems.length > 0 ? (
-                                    <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
-                                      <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center' }}>
-                                        {previewItems.map((item, idx) => (
-                                          <span
-                                            key={item.stat}
-                                            style={{
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: 4,
-                                              marginRight: idx < previewItems.length - 1 ? 6 : 0,
-                                              color: item.highlight ? '#d4af37' : undefined,
-                                            }}
-                                          >
-                                            <img
-                                              src={getStatIconUrl(item.stat)}
-                                              alt={item.stat}
-                                              style={{
-                                                width: 11,
-                                                height: 11,
-                                                opacity: 0.85,
-                                                filter: item.highlight ? 'brightness(1.05) sepia(1) hue-rotate(10deg) saturate(4)' : undefined,
-                                              }}
-                                            />
-                                            <span>{item.value}</span>
-                                            {idx < previewItems.length - 1 && <span>·</span>}
-                                          </span>
-                                        ))}
-                                      </span>
-                                    </Text>
-                                  ) : (
-                                    <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
-                                      Stats unavailable
-                                    </Text>
+                                <div style={{ display: 'flex', gap: 8, maxWidth: 280, alignItems: 'flex-start' }}>
+                                  {lightConeId && (
+                                    <img
+                                      src={getLightConeIconUrl(lightConeId)}
+                                      style={{ height: 75, width: 'auto', borderRadius: 3, border: `1px solid ${token.colorBorderSecondary}` }}
+                                    />
                                   )}
+                                  <div style={{ minWidth: 0 }}>
+                                    <Flex wrap="wrap" gap={4} style={{ marginBottom: 6 }}>
+                                      {previewRelics.map((relic, idx) => (
+                                        <img
+                                          key={`${relic.uid ?? relic.id ?? idx}`}
+                                          src={getRelicImageUrl(relic)}
+                                          style={{ width: 18, height: 18, borderRadius: 3, border: `1px solid ${token.colorBorderSecondary}` }}
+                                        />
+                                      ))}
+                                    </Flex>
+                                    {previewItems.length > 0 ? (
+                                      <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
+                                        <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center' }}>
+                                          {previewItems.map((item, idx) => (
+                                            <span
+                                              key={item.stat}
+                                              style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                marginRight: idx < previewItems.length - 1 ? 6 : 0,
+                                                color: item.highlight ? '#d4af37' : undefined,
+                                              }}
+                                            >
+                                              <img
+                                                src={getStatIconUrl(item.stat)}
+                                                alt={item.stat}
+                                                style={{
+                                                  width: 11,
+                                                  height: 11,
+                                                  opacity: 0.85,
+                                                  filter: item.highlight ? 'brightness(1.05) sepia(1) hue-rotate(10deg) saturate(4)' : undefined,
+                                                }}
+                                              />
+                                              <span>{item.value}</span>
+                                              {idx < previewItems.length - 1 && <span>·</span>}
+                                            </span>
+                                          ))}
+                                        </span>
+                                      </Text>
+                                    ) : (
+                                      <Text style={{ fontSize: 11, color: token.colorTextSecondary }}>
+                                        Stats unavailable
+                                      </Text>
+                                    )}
+                                  </div>
                                 </div>
                               }
                             >

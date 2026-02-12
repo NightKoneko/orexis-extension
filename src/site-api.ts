@@ -42,6 +42,19 @@ export function getCharacterMeta(characterId: string): Record<string, unknown> |
   return (all[characterId] as Record<string, unknown>) ?? null
 }
 
+export function getLightConeMeta(lightConeId: string): Record<string, unknown> | null {
+  if (!lightConeId) return null
+  try {
+    const db = getDBMetadata()?.lightCones
+    if (db && db[lightConeId]) return db[lightConeId] as Record<string, unknown>
+  } catch { /* ignore */ }
+  try {
+    const store = (getStoreState()?.metadata as Record<string, unknown> | undefined)?.lightCones as Record<string, unknown> | undefined
+    if (store && store[lightConeId]) return store[lightConeId] as Record<string, unknown>
+  } catch { /* ignore */ }
+  return null
+}
+
 export function getAssets() {
   return window.Assets ?? null
 }
@@ -75,6 +88,26 @@ export function getSetImageUrl(set: string, part: string): string {
   if (!setId) return getBlankUrl()
   const suffix = getPartSuffix(part)
   return buildAssetUrl(`/icon/relic/${setId}${suffix}.webp`)
+}
+
+export function getLightConeIconUrl(lightConeId: string): string {
+  if (!lightConeId) return getBlankUrl()
+
+  const assets = getAssets() as Record<string, unknown> | null
+  const directGetter = assets?.getLightConeIcon ?? assets?.getLightConeImage ?? assets?.getLightCone
+  if (typeof directGetter === 'function') {
+    return (directGetter as (id: string) => string)(lightConeId)
+  }
+
+  const meta = getLightConeMeta(lightConeId)
+  const rawIcon = (meta?.icon ?? meta?.iconPath ?? meta?.image ?? meta?.imagePath ?? meta?.portrait ?? meta?.avatar) as string | undefined
+  if (rawIcon) {
+    if (/^https?:\/\//i.test(rawIcon)) return rawIcon
+    const normalized = rawIcon.startsWith('/') ? rawIcon : `/${rawIcon}`
+    return buildAssetUrl(normalized)
+  }
+
+  return buildAssetUrl(`/image/light_cone_portrait/${lightConeId}.webp`)
 }
 
 export function getStatIconUrl(stat: string): string {
