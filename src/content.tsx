@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import lightConeRanks from './assets/light_cone_ranks.json'
+import { checkBackendStatus } from './utils/bridge'
 import {
   OREXIS_PAGE_KEY,
   STORE_WAIT_TIMEOUT,
@@ -15,6 +16,8 @@ import {
 if (!window.__hsrLightConeRanks) {
   window.__hsrLightConeRanks = lightConeRanks
 }
+
+const OREXIS_CONNECTION_ID = 'orexis-connection-indicator'
 
 function waitForStore(timeout = STORE_WAIT_TIMEOUT): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -59,6 +62,146 @@ function queryFirst(selectors: readonly string[]): Element | null {
     if (el) return el
   }
   return null
+}
+
+function findHeaderBadgeContainer(): HTMLElement | null {
+  const header = document.querySelector('header.ant-layout-header')
+  if (!header) return null
+
+  const badgeImg = header.querySelector(
+    'img[src*="badgediscord"], img[src*="badgegithub"], img[src*="badgekofi"]'
+  )
+  const badgeAnchor = badgeImg?.closest('a')
+  const container = badgeAnchor?.parentElement ?? header
+  return container as HTMLElement
+}
+
+function startConnectionIndicator(indicator: HTMLDivElement) {
+  if (indicator.dataset.orexisInterval === 'true') return
+  indicator.dataset.orexisInterval = 'true'
+
+  const dot = indicator.querySelector('[data-role="orexis-dot"]') as HTMLSpanElement | null
+  const label = indicator.querySelector('[data-role="orexis-label"]') as HTMLSpanElement | null
+
+  const update = async () => {
+    try {
+      const status = await checkBackendStatus()
+      const connected = !!status.connected
+      if (dot) {
+        dot.style.background = connected ? '#3fb950' : '#e5534b'
+        dot.style.boxShadow = connected
+          ? '0 0 0 2px rgba(63, 185, 80, 0.2)'
+          : '0 0 0 2px rgba(229, 83, 75, 0.2)'
+      }
+      if (label) {
+        label.textContent = connected ? 'Orexis Connected' : 'Orexis Disconnected'
+      }
+    } catch {
+      if (dot) {
+        dot.style.background = '#e5534b'
+        dot.style.boxShadow = '0 0 0 2px rgba(229, 83, 75, 0.2)'
+      }
+      if (label) {
+        label.textContent = 'Orexis Disconnected'
+      }
+    }
+  }
+
+  update()
+  window.setInterval(update, 2000)
+}
+
+function injectConnectionIndicator(): boolean {
+  if (document.getElementById(OREXIS_CONNECTION_ID)) return true
+
+  const container = findHeaderBadgeContainer()
+  if (!container) return false
+
+  const indicator = document.createElement('div') as HTMLDivElement
+  indicator.id = OREXIS_CONNECTION_ID
+
+  function findLanguageSelector(): Element | null {
+    const header = document.querySelector('header.ant-layout-header')
+    if (!header) return null
+    const langSelectors = [
+      '[data-role="language"]',
+      '.language-selector',
+      '.lang-select',
+      'select[name="language"]',
+      'button[aria-label*="language"]',
+      '.ant-select',
+    ]
+    for (const s of langSelectors) {
+      const el = header.querySelector(s)
+      if (el) return el
+    }
+    return null
+  }
+
+  const langEl = findLanguageSelector()
+
+  const selectorRoot = langEl
+    ? (langEl.matches('.ant-select') ? langEl : langEl.closest('.ant-select'))
+    : null
+  const selectorVisual = selectorRoot?.querySelector('.ant-select-selector') ?? selectorRoot ?? langEl
+  const selectorStyle = selectorVisual ? getComputedStyle(selectorVisual) : null
+
+  const baseBackground = selectorStyle?.backgroundColor && selectorStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
+    ? selectorStyle.backgroundColor
+    : 'rgba(255, 255, 255, 0.08)'
+  const baseBorder = selectorStyle?.borderColor || 'rgba(255, 255, 255, 0.2)'
+  const baseRadius = selectorStyle?.borderRadius || '6px'
+  const baseHeight = selectorStyle?.height && selectorStyle.height !== 'auto' ? selectorStyle.height : '32px'
+  const baseText = selectorStyle?.color || 'inherit'
+  const baseFontSize = selectorStyle?.fontSize || '13px'
+
+  indicator.style.cssText = [
+    'display:inline-flex',
+    'align-items:center',
+    'justify-content:center',
+    'gap:8px',
+    `height:${baseHeight}`,
+    'min-height:32px',
+    'padding:0 10px',
+    `border-radius:${baseRadius}`,
+    `color:${baseText}`,
+    `background:${baseBackground}`,
+    `border:1px solid ${baseBorder}`,
+    `font-size:${baseFontSize}`,
+    'font-weight:500',
+    'line-height:1',
+    'cursor:default',
+    'user-select:none',
+    'box-sizing:border-box',
+    'transition:filter .12s ease, border-color .12s ease',
+  ].join(';')
+
+  indicator.innerHTML = `
+    <span data-role="orexis-dot" style="width:9px;height:9px;min-width:9px;min-height:9px;border-radius:50%;background:#e5534b;display:inline-flex;align-self:center;box-shadow:0 0 0 2px rgba(229, 83, 75, 0.2);"></span>
+    <span data-role="orexis-label" style="display:inline-flex;align-items:center;white-space:nowrap;line-height:1;">Orexis Disconnected</span>
+  `
+
+  indicator.addEventListener('mouseenter', () => {
+    indicator.style.filter = 'brightness(1.05)'
+  })
+  indicator.addEventListener('mouseleave', () => {
+    indicator.style.filter = 'none'
+  })
+
+  if (langEl && langEl.parentElement) {
+    indicator.style.marginRight = '8px'
+    langEl.parentElement.insertBefore(indicator, langEl)
+  } else {
+    const firstBadge = container.querySelector('a[href*="ko-fi"], a[href*="github"], a[href*="discord"]')
+    if (firstBadge) {
+      container.insertBefore(indicator, firstBadge)
+    } else {
+      container.appendChild(indicator)
+    }
+  }
+
+  startConnectionIndicator(indicator)
+  return true
 }
 
 function createOrexisTabContainer(): HTMLDivElement {
@@ -192,6 +335,10 @@ async function injectOrexis() {
 
     if (!injectMenuItem()) {
       console.error('[Orexis] Failed to inject menu item')
+    }
+
+    if (!injectConnectionIndicator()) {
+      console.warn('[Orexis] Failed to inject connection indicator')
     }
 
     if (!injectTabContent(container)) {

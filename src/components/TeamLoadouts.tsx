@@ -18,7 +18,7 @@ import {
   getLightConeIconUrl,
   getLightConeMeta,
 } from '../site-api'
-import { applyLoadout } from '../utils/bridge'
+import { applyLoadout, checkBackendStatus } from '../utils/bridge'
 import { getRelicUid, getRelicImageUrl, sortRelicsBySlot, getSlotIndex } from '../utils/relics'
 import { RelicCard } from './RelicCard'
 import { BuildEditor } from './BuildEditor'
@@ -100,6 +100,15 @@ function setsEqual<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
     if (!b.has(value)) return false
   }
   return true
+}
+
+async function waitForBackendConnected(maxAttempts = 10, delayMs = 300): Promise<boolean> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const status = await checkBackendStatus()
+    if (status.connected) return true
+    await new Promise(resolve => setTimeout(resolve, delayMs))
+  }
+  return false
 }
 
 function FilterIcon({ src, active, onClick, title, size = 26 }: {
@@ -500,6 +509,12 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
   const handleApplyTeams = async () => {
     if (selectedTeamIds.size === 0) return
 
+    const backendReady = await waitForBackendConnected()
+    if (!backendReady) {
+      message.error('Backend not connected')
+      return
+    }
+
     const selectedTeams = allTeams.filter(t => selectedTeamIds.has(t.id) && !t.id.startsWith('draft_'))
     
     for (const team of selectedTeams) {
@@ -524,14 +539,35 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
           continue
         }
 
+        const characterName = resolveCharacterName(state, character)
+        const buildLabel = build?.name ?? 'Equipped'
         const loadout = {
           avatar_id: Number(character.id),
-          name: `${resolveCharacterName(state, character)} - ${build?.name ?? 'Equipped'}`,
+          name: `${characterName} - ${buildLabel}`,
           relic_uids: finalRelicIds.map(Number),
         }
 
         try {
-          await applyLoadout(loadout)
+          const result = await applyLoadout(loadout)
+          if (!result.ok) {
+            const shouldRetry = result.error === 'Not connected to backend'
+              || result.error === 'Backend response timeout'
+            if (shouldRetry) {
+              const retryReady = await waitForBackendConnected()
+              if (!retryReady) {
+                message.error('Backend not connected')
+                continue
+              }
+              const retryResult = await applyLoadout(loadout)
+              if (!retryResult.ok) {
+                message.error(`Failed to apply ${characterName}: ${retryResult.error ?? 'Unknown error'}`)
+                continue
+              }
+            } else {
+              message.error(`Failed to apply ${characterName}: ${result.error ?? 'Unknown error'}`)
+              continue
+            }
+          }
           await new Promise(r => setTimeout(r, LOADOUT_APPLY_DELAY))
         } catch {
           message.error('Extension communication failed')
