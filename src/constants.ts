@@ -41,6 +41,10 @@ export function deriveAssetBasePath(): string {
 
 export const SLOT_ORDER = ['Head', 'Hands', 'Body', 'Feet', 'PlanarSphere', 'LinkRope'] as const
 
+export const RELIC_CARD_WIDTH = 198
+export const RELIC_CARD_HEIGHT = 278
+export const TEAM_PANEL_MIN_WIDTH = RELIC_CARD_WIDTH * 6 + 8 * 5 + 48
+
 export const SLOT_DISPLAY_NAMES: Record<number, string> = {
   0: 'Head',
   1: 'Hands',
@@ -55,4 +59,29 @@ export const GRADE_COLORS: Record<number, string> = {
   4: '#cc52f1',
   3: '#58beed',
   2: '#63e8a2',
+}
+
+export const READABLE_STATS: Record<string, string> = {
+  'HP%': 'HP %',
+  'HP': 'HP',
+  'ATK%': 'ATK %',
+  'ATK': 'ATK',
+  'DEF%': 'DEF %',
+  'DEF': 'DEF',
+  'SPD%': 'SPD %',
+  'SPD': 'SPD',
+  'CRIT Rate': 'CRIT Rate',
+  'CRIT DMG': 'CRIT DMG',
+  'Effect Hit Rate': 'Effect HIT',
+  'Effect RES': 'Effect RES',
+  'Break Effect': 'Break Effect',
+  'Energy Regeneration Rate': 'Energy Regen',
+  'Outgoing Healing Boost': 'Healing Boost',
+  'Physical DMG Boost': 'Physical DMG',
+  'Fire DMG Boost': 'Fire DMG',
+  'Ice DMG Boost': 'Ice DMG',
+  'Lightning DMG Boost': 'Lightning DMG',
+  'Wind DMG Boost': 'Wind DMG',
+  'Quantum DMG Boost': 'Quantum DMG',
+  'Imaginary DMG Boost': 'Imaginary DMG',
 }

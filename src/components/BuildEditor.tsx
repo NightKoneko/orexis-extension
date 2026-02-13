@@ -3,7 +3,7 @@ import { Modal, Input, Flex, Typography, Button, Select, message, theme } from '
 import { RelicCard } from './RelicCard'
 import type { Relic, Build, OptimizerState, Character } from '../types'
 import { getBuildRelicIds } from '../types'
-import { SLOT_DISPLAY_NAMES, SLOT_ORDER } from '../constants'
+import { RELIC_CARD_HEIGHT, RELIC_CARD_WIDTH, SLOT_DISPLAY_NAMES, SLOT_ORDER } from '../constants'
 import {
   getOptimizerState,
   resolveCharacterName,
@@ -283,8 +283,8 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
 
   const currentSlotRelics = filteredRelics
   const selectedRelicId = selectedRelicIds[activeSlot]
-  const CARD_WIDTH = 160
-  const CARD_HEIGHT = 220
+  const CARD_WIDTH = RELIC_CARD_WIDTH
+  const CARD_HEIGHT = RELIC_CARD_HEIGHT
   const CARD_GAP = 8
   const GRID_PADDING = 4
   const fallbackWidth = typeof window !== 'undefined'

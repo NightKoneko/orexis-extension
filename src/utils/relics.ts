@@ -1,8 +1,47 @@
 import type { Relic } from '../types'
-import { getSetImageUrl, getStatIconUrl as _getStatIconUrl } from '../site-api'
+import { getI18n, getSetImageUrl, getStatIconUrl as _getStatIconUrl } from '../site-api'
+import { READABLE_STATS } from '../constants'
 
 export { _getStatIconUrl as getStatIconUrl }
 export { GRADE_COLORS } from '../constants'
+
+const FLAT_STATS = new Set(['HP', 'ATK', 'DEF', 'SPD'])
+
+function getLocale(): Intl.LocalesArgument {
+  const i18n = getI18n()
+  const resolved = i18n?.resolvedLanguage
+  if (!resolved) return undefined
+  return resolved.replace('_', '-')
+}
+
+function localeNumber(value: number): string {
+  return value.toLocaleString(getLocale(), { maximumFractionDigits: 0, minimumFractionDigits: 0, useGrouping: false })
+}
+
+function localeNumber_0(value: number): string {
+  return value.toLocaleString(getLocale(), { maximumFractionDigits: 1, minimumFractionDigits: 1, useGrouping: false })
+}
+
+function truncate10ths(value: number): number {
+  return Math.floor(value * 10) / 10
+}
+
+export function isFlatStat(stat: string): boolean {
+  return FLAT_STATS.has(stat)
+}
+
+export function getReadableStatName(stat: string): string {
+  const i18n = getI18n()
+  if (i18n?.t) {
+    const common = i18n.t(`common:ReadableStats.${stat}`)
+    if (common && !common.includes('ReadableStats.')) return common
+
+    const raw = i18n.t(`ReadableStats.${stat}`)
+    if (raw && !raw.includes('ReadableStats.')) return raw
+  }
+
+  return READABLE_STATS[stat] ?? stat
+}
 
 export function getRelicImageUrl(relic: Relic): string {
   return getSetImageUrl(relic.set, relic.part)
@@ -11,6 +50,24 @@ export function getRelicImageUrl(relic: Relic): string {
 // c
 export function getRelicUid(relic: Relic): string | undefined {
   return relic.uid ?? relic.id
+}
+
+export function renderSubstatNumber(stat: string, value: number, verified?: boolean): string {
+  if (stat === 'SPD') {
+    return verified
+      ? localeNumber_0(truncate10ths(value))
+      : localeNumber(Math.floor(value))
+  }
+
+  return isFlatStat(stat)
+    ? localeNumber(Math.floor(value))
+    : localeNumber_0(truncate10ths(value))
+}
+
+export function renderMainStatNumber(stat: string, value: number): string {
+  return isFlatStat(stat)
+    ? localeNumber(Math.floor(value))
+    : localeNumber_0(truncate10ths(value))
 }
 
 export function getSlotIndex(part: string): number {
@@ -23,18 +80,6 @@ export function getSlotIndex(part: string): number {
   if (lower.includes('rope') || lower.includes('link') || lower.includes('cable')) return 5
   return -1
 }
-
-export function formatStatValue(stat: string, value: number): string {
-  if (value == null || Number.isNaN(value)) return ''
-
-  const isPercent = /%|Rate|Boost|DMG|Effect/i.test(stat)
-  if (isPercent) {
-    const normalized = value <= 1 ? value * 100 : value
-    return `${normalized.toFixed(normalized % 1 === 0 ? 0 : 1)}%`
-  }
-  return `${Math.round(value)}`
-}
-
 
 export function groupRelicsBySlot(relics: Relic[]): Relic[][] {
   const groups: Relic[][] = [[], [], [], [], [], []]

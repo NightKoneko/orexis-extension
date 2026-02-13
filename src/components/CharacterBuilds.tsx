@@ -15,7 +15,7 @@ import {
 } from '../site-api'
 import { applyLoadout } from '../utils/bridge'
 import { sortRelicsBySlot, getSlotIndex, getRelicUid } from '../utils/relics'
-import { SLOT_ORDER } from '../constants'
+import { RELIC_CARD_HEIGHT, RELIC_CARD_WIDTH, SLOT_ORDER, TEAM_PANEL_MIN_WIDTH } from '../constants'
 import { BuildEditor } from './BuildEditor'
 import { RelicCard } from './RelicCard'
 
@@ -232,9 +232,9 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
         <div
           key={`slot-${index}-empty`}
           style={{
-            width: 160,
-            minWidth: 160,
-            height: 220,
+            width: RELIC_CARD_WIDTH,
+            minWidth: RELIC_CARD_WIDTH,
+            height: RELIC_CARD_HEIGHT,
             border: `1px dashed ${token.colorBorderSecondary}`,
             borderRadius: token.borderRadius,
             background: token.colorFillQuaternary,
@@ -364,7 +364,7 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
 
   return (
     <>
-      <Flex gap={16} align="start">
+      <Flex gap={16} align="start" justify="center">
         <Flex vertical gap={8} style={{ width: 280 }}>
           <Input
             placeholder="Search characters..."
@@ -482,6 +482,7 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
         <div
           style={{
             flex: 1,
+            minWidth: TEAM_PANEL_MIN_WIDTH,
             borderRadius: 6,
             background: token.colorBgContainer,
             boxShadow: cardShadow,

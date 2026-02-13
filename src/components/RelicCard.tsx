@@ -1,13 +1,18 @@
 import { memo } from 'react'
-import { Card, Divider, Flex, theme } from 'antd'
+import { Card, Divider, Flex, Tooltip, theme } from 'antd'
+import { CheckCircleFilled } from '@ant-design/icons'
 import type { Relic } from '../types'
 import {
   GRADE_COLORS,
-  formatStatValue,
+  getReadableStatName,
   getRelicImageUrl,
   getStatIconUrl,
+  isFlatStat,
+  renderMainStatNumber,
+  renderSubstatNumber,
 } from '../utils'
-import { getBlankUrl, getCharacterAvatarUrl } from '../site-api'
+import { RELIC_CARD_HEIGHT, RELIC_CARD_WIDTH } from '../constants'
+import { getBlankUrl, getCharacterAvatarUrl, getI18n } from '../site-api'
 
 const RollArrow = () => (
   <span style={{ marginRight: -5, opacity: 0.75 }}>
@@ -19,45 +24,67 @@ const RollArrow = () => (
   </span>
 )
 
-const GradeIndicator = ({ grade, enhance }: { grade: number; enhance: number }) => {
-  const color = GRADE_COLORS[grade] ?? GRADE_COLORS[5]
-  return (
-    <Flex align="center" gap={8}>
-      <span>
-        <svg width="14" height="14" viewBox="0 0 14 14" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
-          <circle cx="7" cy="7" r="7" fill={color} />
-        </svg>
-      </span>
-      <span>+{enhance}</span>
-    </Flex>
-  )
+const CircleIcon = ({ color }: { color?: string }) => (
+  <svg width="14" height="14" viewBox="0 0 14 14" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+    <circle cx="7" cy="7" r="7" fill={color || 'transparent'} />
+  </svg>
+)
+
+function getVerifiedTooltipText(): string | null {
+  const i18n = getI18n()
+  if (!i18n?.t) return null
+  const translated = i18n.t('VerifiedRelicHoverText')
+  if (translated && !translated.includes('VerifiedRelicHoverText')) return translated
+  return null
+}
+
+function renderGradeIcon(relic: Relic) {
+  const color = GRADE_COLORS[relic.grade] ?? GRADE_COLORS[5]
+  if (relic.verified) {
+    const tooltip = getVerifiedTooltipText()
+    const icon = <CheckCircleFilled style={{ fontSize: '14px', color }} />
+    return tooltip ? <Tooltip mouseEnterDelay={0.4} title={tooltip}>{icon}</Tooltip> : icon
+  }
+
+  return <CircleIcon color={color} />
 }
 
 const StatRow = ({ 
-  stat, 
-  value, 
-  isMain = false, 
+  stat,
+  value,
+  isMain = false,
   addedRolls = 0,
   iconStyle,
+  verified,
 }: { 
-  stat: string
-  value: number
+  stat?: string
+  value?: number
   isMain?: boolean
   addedRolls?: number
   iconStyle?: { width: number; height: number; marginRight: number; marginLeft: number }
+  verified?: boolean
 }) => {
-  const displayValue = formatStatValue(stat, value)
-  const iconUrl = getStatIconUrl(stat)
   const finalIconStyle = iconStyle ?? { width: 22, height: 22, marginRight: 2, marginLeft: -3 }
+
+  if (!stat || value == null) {
+    return <img src={getBlankUrl()} style={finalIconStyle} alt="" />
+  }
+
+  const displayValue = isMain
+    ? renderMainStatNumber(stat, value)
+    : renderSubstatNumber(stat, value, verified)
+  const iconUrl = getStatIconUrl(stat)
+  const label = getReadableStatName(stat)
+  const suffix = isFlatStat(stat) ? '' : '%'
   
   if (isMain) {
     return (
       <Flex justify="space-between" align="center">
         <Flex>
           <img src={iconUrl} style={finalIconStyle} alt="" />
-          {stat}
+          {label}
         </Flex>
-        {displayValue}
+        {displayValue}{suffix}
       </Flex>
     )
   }
@@ -66,7 +93,7 @@ const StatRow = ({
     <Flex justify="space-between" align="center">
       <Flex>
         <img src={iconUrl} style={finalIconStyle} alt="" />
-        {stat}
+        {label}
       </Flex>
       <Flex justify="space-between" style={{ width: '41.5%' }}>
         <Flex align="center">
@@ -75,7 +102,7 @@ const StatRow = ({
             : <div />
           }
         </Flex>
-        {displayValue}
+        {displayValue}{suffix}
       </Flex>
     </Flex>
   )
@@ -88,6 +115,8 @@ export interface RelicCardProps {
   onSelect?: (uid: string | null) => void
   showScore?: boolean
   compact?: boolean
+  size?: 'compact' | 'comfortable' | 'regular'
+  fillWidth?: boolean
 }
 
 export const RelicCard = memo(function RelicCard({
@@ -95,19 +124,38 @@ export const RelicCard = memo(function RelicCard({
   uid = null,
   selected = false,
   onSelect,
-  compact = false,
+  fillWidth = false,
 }: RelicCardProps) {
   const { token } = theme.useToken()
   const relicSrc = getRelicImageUrl(relic)
   const equippedBySrc = relic.equippedBy 
     ? getCharacterAvatarUrl(relic.equippedBy)
     : getBlankUrl()
-  
-  const ICON_SIZE = compact ? 36 : 50
-  const CARD_WIDTH = compact ? 160 : 200
-  const CARD_HEIGHT = compact ? 220 : 280
-  const CONTENT_HEIGHT = compact ? 195 : 255
-  const ICON_STYLE = compact ? { width: 16, height: 16, marginRight: 2, marginLeft: -2 } : { width: 22, height: 22, marginRight: 2, marginLeft: -3 }
+
+  const ICON_SIZE = 54
+  const CARD_WIDTH = RELIC_CARD_WIDTH
+  const CARD_HEIGHT = RELIC_CARD_HEIGHT
+  const CONTENT_HEIGHT = 255
+  const STAT_GAP = 6
+  const ICON_STYLE = { width: 22, height: 22, marginRight: 2, marginLeft: -3 }
+  const JUSTIFY: 'space-around' | 'space-between' = 'space-around'
+  const substats = Array.from({ length: 4 }, (_, index) => relic.substats?.[index])
+  const showEnhance = relic.id != null || relic.uid != null
+  const language = getI18n()?.resolvedLanguage
+  const isCompactLanguage = language === 'fr_FR' || language === 'pt_BR' || language === 'vi_VN'
+  const statTextStyle = {
+    whiteSpace: 'nowrap' as const,
+    letterSpacing: '-0.2px',
+    ...(isCompactLanguage ? { fontSize: '13px', lineHeight: '22px' } : {}),
+  }
+
+  const userAgent = navigator.userAgent
+  const isMobile = /Android|iPhone|iPad/i.test(userAgent)
+  const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent)
+  const showcaseShadow = (isMobile || isSafari)
+    ? 'rgb(0, 0, 0) 1px 0px 6px'
+    : 'rgb(0, 0, 0) 1px 1px 6px'
+  const showcaseShadowInsetAddition = ', inset rgb(255 255 255 / 30%) 0px 0px 2px'
   
   return (
     <Card
@@ -115,18 +163,22 @@ export const RelicCard = memo(function RelicCard({
       hoverable
       onClick={onSelect ? () => onSelect(uid) : undefined}
       style={{
-        width: CARD_WIDTH,
-        minWidth: CARD_WIDTH,
+        width: fillWidth ? '100%' : CARD_WIDTH,
+        minWidth: fillWidth ? 0 : CARD_WIDTH,
         height: CARD_HEIGHT,
-        backgroundColor: selected ? token.colorPrimaryBg : token.colorBgContainer,
-        borderColor: selected ? token.colorPrimaryBorder : token.colorBorderSecondary,
+        backgroundColor: selected ? token.colorPrimaryBg : undefined,
+        borderColor: selected ? token.colorPrimaryBorder : undefined,
         transition: 'background-color 0.35s, box-shadow 0.25s, border-color 0.25s',
-        borderRadius: token.borderRadius,
-        boxShadow: token.boxShadowSecondary,
+        borderRadius: 6,
+        boxShadow: showcaseShadow + showcaseShadowInsetAddition,
         cursor: 'pointer',
       }}
     >
-      <Flex vertical justify="space-between" style={{ height: CONTENT_HEIGHT }}>
+      <Flex
+        vertical
+        justify={JUSTIFY}
+        style={{ height: CONTENT_HEIGHT, ...statTextStyle }}
+      >
         <Flex justify="space-between" align="center">
           <img
             src={relicSrc}
@@ -134,36 +186,43 @@ export const RelicCard = memo(function RelicCard({
             style={{ height: ICON_SIZE, width: ICON_SIZE }}
             alt=""
           />
-          <GradeIndicator grade={relic.grade} enhance={relic.enhance} />
+          <Flex align="center" gap={8}>
+            <span>{renderGradeIcon(relic)}</span>
+            <span>{showEnhance ? `+${relic.enhance}` : ''}</span>
+          </Flex>
           <img
             src={equippedBySrc}
             style={{
               height: ICON_SIZE,
               width: ICON_SIZE,
               borderRadius: ICON_SIZE / 2,
-              border: relic.equippedBy ? `1px solid ${token.colorBorderSecondary}` : undefined,
-              backgroundColor: relic.equippedBy ? token.colorFillQuaternary : undefined,
+              border: relic.equippedBy ? '1px solid rgba(150, 150, 150, 0.25)' : undefined,
+              backgroundColor: relic.equippedBy ? 'rgba(0, 0, 0, 0.1)' : undefined,
             }}
             alt=""
           />
         </Flex>
 
-        <Divider style={{ margin: compact ? '4px 0' : '6px 0' }} />
+        <Divider style={{ margin: '6px 0px 6px 0px' }} />
 
-        {relic.main && (
-          <StatRow stat={relic.main.stat} value={relic.main.value} isMain iconStyle={ICON_STYLE} />
-        )}
+        <StatRow
+          stat={relic.main?.stat}
+          value={relic.main?.value}
+          isMain
+          iconStyle={ICON_STYLE}
+        />
 
-        <Divider style={{ margin: compact ? '4px 0' : '6px 0' }} />
+        <Divider style={{ margin: '6px 0px 6px 0px' }} />
 
-        <Flex vertical gap={0}>
-          {relic.substats.map((sub, i) => (
+        <Flex vertical gap={STAT_GAP}>
+          {substats.map((sub, i) => (
             <StatRow
               key={i}
-              stat={sub.stat}
-              value={sub.value}
-              addedRolls={sub.addedRolls}
+              stat={sub?.stat}
+              value={sub?.value}
+              addedRolls={sub?.addedRolls}
               iconStyle={ICON_STYLE}
+              verified={relic.verified}
             />
           ))}
         </Flex>

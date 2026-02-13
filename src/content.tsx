@@ -213,7 +213,7 @@ function createOrexisTabContainer(): HTMLDivElement {
 
 function renderOrexisApp(container: HTMLElement) {
   const appContainer = document.createElement('div')
-  appContainer.style.cssText = 'display:flex;justify-content:space-around;width:100%'
+  appContainer.style.cssText = 'display:flex;justify-content:center;width:100%'
   container.appendChild(appContainer)
 
   const root = ReactDOM.createRoot(appContainer)

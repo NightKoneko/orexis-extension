@@ -7,7 +7,7 @@ import { getStoreState } from './site-api'
 
 const { darkAlgorithm } = theme
 
-const DEFAULT_CONTENT_WIDTH = 1450
+const DEFAULT_CONTENT_WIDTH = 1600
 
 const defaultGap = 8
 
@@ -31,8 +31,10 @@ export function App() {
         vertical
         gap={defaultGap}
         style={{
-          width: DEFAULT_CONTENT_WIDTH,
-          marginBottom: 200,
+          width: '100%',
+          maxWidth: DEFAULT_CONTENT_WIDTH,
+          margin: '0 auto 200px',
+          padding: '0 24px',
         }}
       >
 

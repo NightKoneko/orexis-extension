@@ -3,7 +3,7 @@ import { Card, Flex, Button, Input, Typography, Tag, Checkbox, message, theme, S
 import { PlusOutlined, DeleteOutlined, TeamOutlined, SendOutlined, EditOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import type { Team, Relic, OptimizerState } from '../types'
 import { getBuildRelicIds } from '../types'
-import { TEAMS_STORAGE_KEY, LOADOUT_APPLY_DELAY, SLOT_ORDER } from '../constants'
+import { TEAMS_STORAGE_KEY, LOADOUT_APPLY_DELAY, RELIC_CARD_HEIGHT, RELIC_CARD_WIDTH, SLOT_ORDER, TEAM_PANEL_MIN_WIDTH } from '../constants'
 import {
   getOptimizerState,
   resolveCharacterName,
@@ -28,6 +28,7 @@ const { Text, Title } = Typography
 
 const PATHS = ['Abundance', 'Destruction', 'Erudition', 'Harmony', 'Hunt', 'Nihility', 'Preservation', 'Remembrance'] as const
 const ELEMENTS = ['Physical', 'Fire', 'Ice', 'Lightning', 'Wind', 'Quantum', 'Imaginary'] as const
+const RELIC_ROW_GAP = 8
 const ELEMENT_TO_DMG_TYPE: Record<string, string> = {
   Physical: 'Physical DMG Boost',
   Fire: 'Fire DMG Boost',
@@ -769,6 +770,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
       <Card
         style={{
           flex: 1,
+          minWidth: TEAM_PANEL_MIN_WIDTH,
           borderRadius: 6,
           background: token.colorBgContainer,
           border: `1px solid ${token.colorBorderSecondary}`,
@@ -1022,7 +1024,15 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                   })
 
                   const getBuildPreview = (previewIndex: number) => {
+                    if (previewIndex < 0 || previewIndex >= builds.length) {
+                      return { previewRelics: [], previewStats: null }
+                    }
+
                     const previewBuild = builds[previewIndex]
+                    if (!previewBuild) {
+                      return { previewRelics: [], previewStats: null }
+                    }
+
                     const previewRelicIds = getBuildRelicIds(previewBuild)
                     const previewFinalRelicIds = previewRelicIds.length ? previewRelicIds : getEquippedRelicIds(character)
                     const previewRelics = sortRelicsBySlot(
@@ -1218,10 +1228,10 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                             value: i,
                             previewIndex: i,
                           }))
-                          : [{ label: 'Equipped', value: -1 }]}
+                          : [{ label: 'Equipped', value: -1, previewIndex: -1 }]}
                         optionRender={(option) => {
                           const previewIndex = (option.data as { previewIndex?: number } | undefined)?.previewIndex
-                          if (typeof previewIndex !== 'number') return <span>{option.label}</span>
+                          if (typeof previewIndex !== 'number' || previewIndex < 0) return <span>{option.label}</span>
 
                           const { previewRelics, previewStats } = getBuildPreview(previewIndex)
                           const previewItems = previewStats
@@ -1382,7 +1392,7 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                   return (
                     <Flex key={`${member.characterId}-relics`} vertical gap={6}>
                       <Text strong>{resolveCharacterName(state, character)} Relics</Text>
-                      <Flex wrap="wrap" gap={8}>
+                      <Flex wrap="nowrap" gap={RELIC_ROW_GAP}>
                         {SLOT_ORDER.map((slot, index) => {
                           const relic = relicsBySlot.get(index)
                           if (relic) {
@@ -1407,9 +1417,9 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                             <div
                               key={`${member.characterId}-empty-${slot}`}
                               style={{
-                                width: 160,
-                                minWidth: 160,
-                                height: 220,
+                                width: RELIC_CARD_WIDTH,
+                                minWidth: RELIC_CARD_WIDTH,
+                                height: RELIC_CARD_HEIGHT,
                                 border: `1px dashed ${token.colorBorderSecondary}`,
                                 borderRadius: token.borderRadius,
                                 background: token.colorFillQuaternary,
