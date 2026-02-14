@@ -73,11 +73,11 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
   const [editingBuildIndex, setEditingBuildIndex] = useState(-1)
   const [buildEditorSlot, setBuildEditorSlot] = useState<number | undefined>(undefined)
   const [buildEditorRelicId, setBuildEditorRelicId] = useState<string | undefined>(undefined)
-    useEffect(() => {
-      if (externalSelectedCharacterId) {
-        setSelectedCharacterId(externalSelectedCharacterId)
-      }
-    }, [externalSelectedCharacterId])
+  useEffect(() => {
+    if (externalSelectedCharacterId) {
+      setSelectedCharacterId(externalSelectedCharacterId)
+    }
+  }, [externalSelectedCharacterId])
 
   const [buildSearch, setBuildSearch] = useState('')
   const [buildSetFilter, setBuildSetFilter] = useState<string | null>(null)
@@ -89,6 +89,35 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
 
   useEffect(() => {
     refreshState()
+  }, [refreshState])
+
+  useEffect(() => {
+    const unsubscribe = window.store?.subscribe?.(() => {
+      refreshState()
+    })
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'state') refreshState()
+    }
+
+    const onFocus = () => {
+      refreshState()
+    }
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) refreshState()
+    }
+
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [refreshState])
 
   const characterMetaMap = useMemo(() => getAllCharacterMeta(), [state])

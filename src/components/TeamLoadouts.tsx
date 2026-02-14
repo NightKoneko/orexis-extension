@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Card, Flex, Button, Input, Typography, Tag, Checkbox, message, theme, Select, Divider, Tooltip } from 'antd'
 import { PlusOutlined, DeleteOutlined, TeamOutlined, SendOutlined, EditOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import type { Team, Relic, OptimizerState } from '../types'
@@ -217,6 +217,78 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
 
   useEffect(() => {
     refreshState()
+  }, [refreshState])
+
+  useEffect(() => {
+    if (!state) return
+
+    const allTeams = draftTeam ? [draftTeam, ...teams] : teams
+    if (allTeams.length === 0) return
+
+    setMemberBuildSelections((prev) => {
+      let changed = false
+      const next: Record<string, Record<string, number>> = { ...prev }
+
+      for (const team of allTeams) {
+        const byTeam = prev[team.id]
+        if (!byTeam) continue
+
+        const updatedByTeam: Record<string, number> = { ...byTeam }
+        let teamChanged = false
+
+        for (const member of team.members) {
+          const selected = byTeam[member.characterId]
+          if (typeof selected !== 'number') continue
+
+          const character = findCharacterById(state, member.characterId)
+          const buildCount = character?.builds?.length ?? 0
+          const nextIndex = buildCount > 0
+            ? Math.min(selected, buildCount - 1)
+            : -1
+
+          if (nextIndex !== selected) {
+            updatedByTeam[member.characterId] = nextIndex
+            teamChanged = true
+          }
+        }
+
+        if (teamChanged) {
+          next[team.id] = updatedByTeam
+          changed = true
+        }
+      }
+
+      return changed ? next : prev
+    })
+  }, [state, teams, draftTeam])
+
+  useEffect(() => {
+    const unsubscribe = window.store?.subscribe?.(() => {
+      refreshState()
+    })
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === 'state') refreshState()
+    }
+
+    const onFocus = () => {
+      refreshState()
+    }
+
+    const onVisibilityChange = () => {
+      if (!document.hidden) refreshState()
+    }
+
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe()
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [refreshState])
 
 
@@ -1222,13 +1294,14 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
                         size="small"
                         value={builds.length ? buildIndex : -1}
                         style={{ width: 220 }}
-                        options={builds.length
-                          ? builds.map((b, i) => ({
+                        options={[
+                          { label: 'Equipped', value: -1, previewIndex: -1 },
+                          ...builds.map((b, i) => ({
                             label: b.name ? b.name : `Build ${i + 1}`,
                             value: i,
                             previewIndex: i,
-                          }))
-                          : [{ label: 'Equipped', value: -1, previewIndex: -1 }]}
+                          })),
+                        ]}
                         optionRender={(option) => {
                           const previewIndex = (option.data as { previewIndex?: number } | undefined)?.previewIndex
                           if (typeof previewIndex !== 'number' || previewIndex < 0) return <span>{option.label}</span>
