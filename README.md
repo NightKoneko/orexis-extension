@@ -1,3 +1,6 @@
+## Installing
+Download the CRX from [Releases](https://github.com/NightKoneko/orexis-extension/releases). Drag and drop the CRX file onto your browser to be prompted to install. 
+
 ## Building
 
 1. Install dependencies:
