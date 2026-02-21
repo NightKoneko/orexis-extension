@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Orexis Extension",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "For use with https://fribbels.github.io/hsr-optimizer",
   "permissions": [
     "storage",
@@ -16,15 +16,23 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://fribbels.github.io/hsr-optimizer*"],
-      "js": ["injector.js"],
+      "matches": [
+        "https://fribbels.github.io/hsr-optimizer*"
+      ],
+      "js": [
+        "injector.js"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["content.js"],
-      "matches": ["https://fribbels.github.io/*"]
+      "resources": [
+        "content.js"
+      ],
+      "matches": [
+        "https://fribbels.github.io/*"
+      ]
     }
   ],
   "browser_specific_settings": {
