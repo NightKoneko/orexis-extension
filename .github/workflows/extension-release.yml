@@ -64,11 +64,31 @@ jobs:
             exit 0
           fi
 
-          CURRENT_VERSION="$(node -p "require('./package.json').version")"
+          git fetch --tags --force
+          LATEST_TAG="$(git tag --list | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          if [ -n "$LATEST_TAG" ]; then
+            BASE_VERSION="$LATEST_TAG"
+          else
+            BASE_VERSION="$(node -p "require('./package.json').version")"
+          fi
+
           BUMP_TYPE="${{ github.event.inputs.bump }}"
-          NEXT_VERSION="$(node -e "const [major,minor,patch]=process.argv[1].split('.').map(Number); const type=process.argv[2]; let m=major,n=minor,p=patch; if(type==='major'){m+=1;n=0;p=0;} else if(type==='minor'){n+=1;p=0;} else {p+=1;} process.stdout.write([m,n,p].join('.'));" "$CURRENT_VERSION" "$BUMP_TYPE")"
+          NEXT_VERSION="$(node -e "const [major,minor,patch]=process.argv[1].split('.').map(Number); const type=process.argv[2]; let m=major,n=minor,p=patch; if(type==='major'){m+=1;n=0;p=0;} else if(type==='minor'){n+=1;p=0;} else {p+=1;} process.stdout.write([m,n,p].join('.'));" "$BASE_VERSION" "$BUMP_TYPE")"
+
+          if git rev-parse -q --verify "refs/tags/$NEXT_VERSION" >/dev/null; then
+            echo "Tag '$NEXT_VERSION' already exists"
+            exit 1
+          fi
 
           NEXT_VERSION="$NEXT_VERSION" node -e "const fs=require('fs'); const version=process.env.NEXT_VERSION; for (const file of ['package.json','manifest.json','manifest.firefox.json']) { const json=JSON.parse(fs.readFileSync(file,'utf8')); json.version=version; fs.writeFileSync(file, JSON.stringify(json, null, 2)+'\\n'); }"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json manifest.json manifest.firefox.json
+          git commit -m "chore(release): ${NEXT_VERSION}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+          RELEASE_SHA="$(git rev-parse HEAD)"
 
           echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
