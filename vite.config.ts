@@ -4,6 +4,7 @@ import { resolve } from 'path'
 import { copyFileSync, mkdirSync, existsSync } from 'fs'
 
 const entryPoint = process.env.ENTRY || 'content'
+const manifestTarget = process.env.MANIFEST_TARGET || 'default'
 
 const entryFiles: Record<string, string> = {
   content: resolve(__dirname, 'src/content.tsx'),
@@ -19,11 +20,12 @@ export default defineConfig({
       closeBundle() {
         if (entryPoint === 'content') {
           const distDir = resolve(__dirname, 'dist')
+          const manifestFileName = manifestTarget === 'firefox' ? 'manifest.firefox.json' : 'manifest.json'
           if (!existsSync(distDir)) {
             mkdirSync(distDir, { recursive: true })
           }
           copyFileSync(
-            resolve(__dirname, 'manifest.json'),
+            resolve(__dirname, manifestFileName),
             resolve(distDir, 'manifest.json')
           )
         }

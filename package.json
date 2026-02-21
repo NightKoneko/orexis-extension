@@ -6,13 +6,15 @@
     "dev": "npm run build",
     "dev:watch": "concurrently \"npm run watch:content\" \"npm run watch:background\" \"npm run watch:injector\"",
     "build": "npm run build:content && npm run build:background && npm run build:injector",
+    "build:firefox": "cross-env MANIFEST_TARGET=firefox npm run build",
     "build:content": "cross-env ENTRY=content vite build",
     "build:background": "cross-env ENTRY=background vite build",
     "build:injector": "cross-env ENTRY=injector vite build",
     "watch:content": "cross-env ENTRY=content vite build --watch",
     "watch:background": "cross-env ENTRY=background vite build --watch",
     "watch:injector": "cross-env ENTRY=injector vite build --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sign:firefox": "npm run build:firefox && web-ext sign --source-dir=dist --channel unlisted"
   },
   "dependencies": {
     "antd": "^5.22.0",

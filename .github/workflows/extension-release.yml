@@ -1,0 +1,92 @@
+name: Extension Release
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install extension dependencies
+        run: npm ci
+
+      - name: Prepare artifacts directory
+        run: mkdir -p artifacts
+
+      - name: Validate required secrets
+        run: |
+          test -n "${{ secrets.FIREFOX_AMO_API_KEY }}" || (echo "Missing FIREFOX_AMO_API_KEY" && exit 1)
+          test -n "${{ secrets.FIREFOX_AMO_API_SECRET }}" || (echo "Missing FIREFOX_AMO_API_SECRET" && exit 1)
+          test -n "${{ secrets.CHROMIUM_CRX_PRIVATE_KEY_PEM }}" || (echo "Missing CHROMIUM_CRX_PRIVATE_KEY_PEM" && exit 1)
+
+      - name: Validate tag format
+        if: github.event_name == 'push'
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if ! [[ "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag '$TAG' is invalid. Use plain semver like 1.0.0"
+            exit 1
+          fi
+
+      - name: Build Chromium extension
+        run: npm run build
+
+      - name: Package Chromium ZIP
+        run: |
+          cd dist
+          zip -r ../artifacts/orexis-chromium.zip .
+
+      - name: Write Chromium CRX private key
+        run: |
+          printf '%s' "${{ secrets.CHROMIUM_CRX_PRIVATE_KEY_PEM }}" > .crx-key.pem
+          chmod 600 .crx-key.pem
+
+      - name: Package Chromium CRX
+        run: npm exec --yes crx3@2.0.0 -- -p .crx-key.pem -o artifacts/orexis-chromium.crx dist
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Sign Firefox XPI
+        run: |
+          npm exec --yes web-ext@8.9.0 -- sign \
+            --source-dir=dist \
+            --channel=unlisted \
+            --api-key="${{ secrets.FIREFOX_AMO_API_KEY }}" \
+            --api-secret="${{ secrets.FIREFOX_AMO_API_SECRET }}" \
+            --artifacts-dir=artifacts
+
+      - name: Normalize Firefox artifact name
+        run: |
+          XPI_PATH="$(ls artifacts/*.xpi | head -n 1)"
+          cp "$XPI_PATH" artifacts/orexis-firefox.xpi
+
+      - name: Remove temporary signing key
+        run: rm -f .crx-key.pem
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/orexis-chromium.crx
+            artifacts/orexis-chromium.zip
+            artifacts/orexis-firefox.xpi
+          fail_on_unmatched_files: true
+          generate_release_notes: true
