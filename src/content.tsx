@@ -321,7 +321,7 @@ function injectOptimizerEquip() {
   const node = document.createElement('div')
   node.id = "OREXIS_EQUIP_FROM_OPTIMIZER"
   
-  const root = ReactDOM.createRoot(node, {identifierPrefix: 'equip_via_raxis'})
+  const root = ReactDOM.createRoot(node, {identifierPrefix: 'equip_via_orexis'})
   
   root.render(<OptimizerEquip/>)
 
