@@ -19,7 +19,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://fribbels.github.io/hsr-optimizer*"
+        "https://fribbels.github.io/hsr-optimizer*",
+        "https://fribbels.github.io/dreary-quibbles*"
       ],
       "js": [
         "injector.js"
