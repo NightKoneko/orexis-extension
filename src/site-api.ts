@@ -142,7 +142,6 @@ export function resolveCharacterName(
   try {
     const dbMeta = getDBMetadata()?.characters?.[id]
     if (dbMeta?.name) return dbMeta.name
-    if (dbMeta?.longName) return dbMeta.longName
   } catch { /* ignore */ }
 
   try {
@@ -210,6 +209,8 @@ export function getOptimizerState(): OptimizerState | null {
       relicsById,
       globalThemeConfig: storeState?.globalThemeConfig,
       metadata: storeState?.metadata,
+      optimizerTabFocusCharacter: storeState?.optimizerTabFocusCharacter,
+      optimizerBuild: storeState?.optimizerBuild ?? {}
     }
   } catch { /* ignore */ }
 

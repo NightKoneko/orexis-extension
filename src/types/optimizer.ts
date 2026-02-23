@@ -22,7 +22,7 @@ export interface Build {
 
 export function getBuildRelicIds(build: Build | null | undefined): string[] {
   if (!build) return []
-  return (build.relicIds ?? build.build ?? []).filter(Boolean)
+  return (build.relicIds ?? build.build ?? []).filter?.(Boolean)
 }
 
 export interface Team {
@@ -47,6 +47,8 @@ export interface OptimizerState {
   metadata?: {
     characters?: Record<string, { id: string; name?: string; displayName?: string }>
   }
+  optimizerTabFocusCharacter: string | undefined
+  optimizerBuild: Record<string, string>
 }
 
 export interface OptimizerStore {
@@ -66,7 +68,7 @@ declare global {
       getRelics: () => Relic[]
       getRelicById: (id: string | undefined) => Relic | undefined
       getRelicsById: () => Partial<Record<string, Relic>>
-      getMetadata?: () => { characters?: Record<string, { name?: string; longName?: string }> }
+      getMetadata?: () => { characters?: Record<string, { name?: string }>, lightCones: Record<string, unknown> }
       setCharacters: (characters: Character[]) => void
       setCharacter: (character: Character) => void
       saveCharacterBuild: (name: string, characterId: string, score: { score: string; rating: string }) => { error?: string } | void

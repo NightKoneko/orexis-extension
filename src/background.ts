@@ -19,7 +19,7 @@ async function openConnection(): Promise<boolean> {
   if (ws?.readyState === WebSocket.OPEN) return true
   if (connectPromise) return connectPromise
 
-  connectPromise = new Promise(async (resolve) => {
+  connectPromise = new Promise<boolean>(async (resolve) => {
     const url = await getWsUrl()
     const socket = new WebSocket(url)
     ws = socket

@@ -16,7 +16,9 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://fribbels.github.io/hsr-optimizer*"],
+      "matches": [
+        "https://fribbels.github.io/hsr-optimizer*"
+        ],
       "js": ["injector.js"],
       "run_at": "document_idle"
     }

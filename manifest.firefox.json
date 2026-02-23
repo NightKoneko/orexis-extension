@@ -1,12 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Orexis Extension",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "For use with https://fribbels.github.io/hsr-optimizer",
   "permissions": [
     "storage",
     "activeTab"
   ],
+  "content_security_policy":{
+    "extension_pages": "connect-src 'self', ws://127.0.0.1:*; default-src 'self'"
+  },
   "host_permissions": [
     "https://fribbels.github.io/*"
   ],
