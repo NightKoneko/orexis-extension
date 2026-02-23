@@ -1,11 +1,17 @@
 import { Typography } from 'antd'
-import styled from 'styled-components'
+import type { ComponentProps, CSSProperties } from 'react'
 
 const { Text } = Typography
 
-export const HeaderText = styled(Text)`
-    text-decoration: underline;
-    text-decoration-color: #6d97ffb3;
-    text-underline-offset: 2px;
-    white-space: nowrap;
-`
+const BASE_STYLE: CSSProperties = {
+    textDecoration: 'underline',
+    textDecorationColor: '#6d97ffb3',
+    textUnderlineOffset: '2px',
+    whiteSpace: 'nowrap',
+}
+
+type HeaderTextProps = ComponentProps<typeof Text>
+
+export function HeaderText({ style, ...props }: HeaderTextProps) {
+    return <Text {...props} style={{ ...BASE_STYLE, ...style }} />
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, Flex, Button, Input, Typography, Tag, Checkbox, message, theme, Select, Divider, Tooltip } from 'antd'
 import { PlusOutlined, DeleteOutlined, TeamOutlined, SendOutlined, EditOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import type { Team, Relic, OptimizerState } from '../types'
