@@ -3,6 +3,7 @@
   "name": "Orexis Extension",
   "version": "1.0.4",
   "description": "For use with https://fribbels.github.io/hsr-optimizer",
+  "update_url": "https://github.com/NightKoneko/orexis-extension/releases/latest/download/chromium-updates.xml",
   "permissions": [
     "storage",
     "activeTab"

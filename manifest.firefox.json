@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Orexis Extension",
-  "version": "1.0.5",
+  "version": "1.0.4",
   "description": "For use with https://fribbels.github.io/hsr-optimizer",
   "permissions": [
     "storage",
@@ -43,6 +43,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "orexis@local",
+      "update_url": "https://github.com/NightKoneko/orexis-extension/releases/latest/download/firefox-updates.json",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
         "required": [

@@ -14,6 +14,7 @@
     "watch:background": "cross-env ENTRY=background vite build --watch",
     "watch:injector": "cross-env ENTRY=injector vite build --watch",
     "typecheck": "tsc --noEmit",
+    "updates:generate": "node scripts/generate-update-manifests.mjs",
     "sign:firefox": "npm run build:firefox && web-ext sign --source-dir=dist --channel unlisted"
   },
   "dependencies": {
