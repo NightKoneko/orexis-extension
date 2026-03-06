@@ -22,7 +22,19 @@ export interface Build {
 
 export function getBuildRelicIds(build: Build | null | undefined): string[] {
   if (!build) return []
-  return (build.relicIds ?? build.build ?? []).filter?.(Boolean)
+
+  const source = build.relicIds ?? build.build ?? []
+
+  if (Array.isArray(source)) {
+    return source.filter((id): id is string => typeof id === 'string' && id.length > 0)
+  }
+
+  if (source && typeof source === 'object') {
+    return Object.values(source as Record<string, unknown>)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+  }
+
+  return []
 }
 
 export interface Team {

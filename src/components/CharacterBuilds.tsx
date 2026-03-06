@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Flex, Button, Input, Typography, Tag, message, theme, Divider, Empty, Select } from 'antd'
+import { Flex, Button, Input, Typography, Tag, message, theme, Divider, Empty, Select, Tooltip } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, SendOutlined, CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons'
 import type { Character, Build, Relic, OptimizerState } from '../types'
 import { getBuildRelicIds } from '../types'
@@ -12,12 +12,17 @@ import {
   getPathIconUrl,
   getElementIconUrl,
   getBlankUrl,
+  getLightConeIconUrl,
+  getLightConeMeta,
+  getStatIconUrl,
 } from '../site-api'
 import { applyLoadout } from '../utils/bridge'
 import { sortRelicsBySlot, getSlotIndex, getRelicUid } from '../utils/relics'
+import { buildRelicsByPart, ELEMENT_TO_DMG_TYPE, formatShowcaseStat, SHOWCASE_STAT_KEYS } from '../utils/showcase'
 import { RELIC_CARD_HEIGHT, RELIC_CARD_WIDTH, SLOT_ORDER, TEAM_PANEL_MIN_WIDTH } from '../constants'
 import { BuildEditor } from './BuildEditor'
 import { RelicCard } from './RelicCard'
+import { getShowcaseStats, type BasicStatsObject } from '../getShowcaseStats'
 
 const { Text } = Typography
 
@@ -347,7 +352,31 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
   }
 
   const selectedCharName = selectedCharacter ? resolveCharacterName(state, selectedCharacter) : ''
-  const builds = selectedCharacter?.builds ?? []
+  const selectedLightConeId = (selectedCharacter?.form as Record<string, unknown> | undefined)?.lightCone as string | undefined
+  const selectedLightConeMeta = selectedLightConeId ? getLightConeMeta(selectedLightConeId) : null
+  const selectedLightConeName = (selectedLightConeMeta?.name ?? selectedLightConeMeta?.longName ?? selectedLightConeMeta?.displayName ?? selectedLightConeId ?? 'Light Cone') as string
+  const selectedElement = selectedCharacter ? (characterMetaMap[selectedCharacter.id]?.element as string | undefined) : undefined
+  const selectedElementalDmgType = selectedElement ? ELEMENT_TO_DMG_TYPE[selectedElement] : undefined
+  const selectedScoringStats = selectedCharacter
+    ? (characterMetaMap[selectedCharacter.id]?.scoringMetadata as { stats?: Record<string, number> } | undefined)?.stats
+    : undefined
+  const builds = useMemo(() => {
+    if (!Array.isArray(selectedCharacter?.builds)) return [] as Build[]
+    return selectedCharacter.builds.filter((b): b is Build => !!b && typeof b === 'object')
+  }, [selectedCharacter])
+
+  const equippedShowcaseStats = useMemo(() => {
+    if (!selectedCharacter || !selectedElementalDmgType) return null
+
+    const relics = getCharacterRelics(selectedCharacter)
+    const displayRelics = buildRelicsByPart(relics)
+
+    try {
+      return getShowcaseStats(selectedCharacter, displayRelics, { elementalDmgType: selectedElementalDmgType })
+    } catch {
+      return null
+    }
+  }, [selectedCharacter, selectedElementalDmgType])
 
   const buildMeta = useMemo(() => {
     return builds.map((build) => {
@@ -356,9 +385,19 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
         relicIds.map(id => getRelicById(id)).filter((r): r is Relic => r != null)
       )
       const setNames = Array.from(new Set(relics.map(r => r.set).filter(Boolean) as string[]))
-      return { relicIds, relics, setNames }
+      let showcaseStats: BasicStatsObject | null = null
+
+      if (selectedCharacter && selectedElementalDmgType) {
+        try {
+          showcaseStats = getShowcaseStats(selectedCharacter, buildRelicsByPart(relics), { elementalDmgType: selectedElementalDmgType })
+        } catch {
+          showcaseStats = null
+        }
+      }
+
+      return { relicIds, relics, setNames, showcaseStats }
     })
-  }, [builds])
+  }, [builds, selectedCharacter, selectedElementalDmgType])
 
   const buildSetOptions = useMemo(() => {
     const sets = new Set<string>()
@@ -581,6 +620,59 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
                     </Button>
                   </Flex>
                 </Flex>
+                {(selectedLightConeId || equippedShowcaseStats) && (
+                  <Flex align="center" gap={8} style={{ marginBottom: 10 }}>
+                    {selectedLightConeId && (
+                      <Tooltip title={selectedLightConeName}>
+                        <img
+                          src={getLightConeIconUrl(selectedLightConeId)}
+                          alt={selectedLightConeName}
+                          style={{ height: 82, width: 'auto', borderRadius: 4, border: `1px solid ${token.colorBorderSecondary}` }}
+                        />
+                      </Tooltip>
+                    )}
+                    <Flex vertical gap={2}>
+                      {equippedShowcaseStats && (
+                        <Text style={{ fontSize: 11, color: token.colorTextSecondary, display: 'block' }}>
+                          <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {SHOWCASE_STAT_KEYS.map((stat, idx) => {
+                              const highlight = (selectedScoringStats?.[stat] ?? 0) > 0
+                              return (
+                                <span
+                                  key={stat}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    marginRight: idx < SHOWCASE_STAT_KEYS.length - 1 ? 6 : 0,
+                                    color: highlight ? '#d4af37' : undefined,
+                                  }}
+                                >
+                                  <img
+                                    src={getStatIconUrl(stat)}
+                                    alt={stat}
+                                    title={stat}
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      opacity: 0.85,
+                                      filter: highlight ? 'brightness(1.05) sepia(1) hue-rotate(10deg) saturate(4)' : undefined,
+                                    }}
+                                  />
+                                  <span>{formatShowcaseStat(stat, equippedShowcaseStats[stat] ?? 0)}</span>
+                                  {idx < SHOWCASE_STAT_KEYS.length - 1 && <span>·</span>}
+                                </span>
+                              )
+                            })}
+                          </span>
+                        </Text>
+                      )}
+                      <Text style={{ fontSize: 12, color: token.colorTextSecondary }}>
+                        {getCharacterRelics(selectedCharacter).length} relics · Equipped
+                      </Text>
+                    </Flex>
+                  </Flex>
+                )}
                 <Flex wrap="wrap" gap={8}>
                   {renderRelicSlots(
                     getCharacterRelics(selectedCharacter),
@@ -627,8 +719,11 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
 
               {filteredBuildIndexes.map((index) => {
                 const build = builds[index]
-                const { relicIds, relics } = buildMeta[index]
+                const { relicIds, relics, showcaseStats } = buildMeta[index]
                 const isCollapsed = collapsedBuilds.has(index)
+                const buildLightConeId = (selectedCharacter.form as Record<string, unknown> | undefined)?.lightCone as string | undefined
+                const buildLightConeMeta = buildLightConeId ? getLightConeMeta(buildLightConeId) : null
+                const buildLightConeName = (buildLightConeMeta?.name ?? buildLightConeMeta?.longName ?? buildLightConeMeta?.displayName ?? buildLightConeId ?? 'Light Cone') as string
 
                 return (
                   <div
@@ -692,14 +787,70 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
                     </Flex>
 
                     {!isCollapsed && (
-                      <Flex wrap="wrap" gap={8}>
-                        {renderRelicSlots(
-                          relics,
-                          (relic) => {
-                            const slot = getSlotIndex(relic.part)
-                            openBuildEditor(index, slot >= 0 ? slot : undefined, getRelicUid(relic))
-                          },
+                      <Flex vertical gap={8}>
+                        {(buildLightConeId || showcaseStats) && (
+                          <Flex align="center" gap={8}>
+                            {buildLightConeId && (
+                              <Tooltip title={buildLightConeName}>
+                                <img
+                                  src={getLightConeIconUrl(buildLightConeId)}
+                                  alt={buildLightConeName}
+                                  style={{ height: 72, width: 'auto', borderRadius: 4, border: `1px solid ${token.colorBorderSecondary}` }}
+                                />
+                              </Tooltip>
+                            )}
+                            <Flex vertical gap={2}>
+                              {showcaseStats && (
+                                <Text style={{ fontSize: 11, color: token.colorTextSecondary, display: 'block' }}>
+                                  <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center' }}>
+                                    {SHOWCASE_STAT_KEYS.map((stat, idx) => {
+                                      const highlight = (selectedScoringStats?.[stat] ?? 0) > 0
+                                      return (
+                                        <span
+                                          key={stat}
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 4,
+                                            marginRight: idx < SHOWCASE_STAT_KEYS.length - 1 ? 6 : 0,
+                                            color: highlight ? '#d4af37' : undefined,
+                                          }}
+                                        >
+                                          <img
+                                            src={getStatIconUrl(stat)}
+                                            alt={stat}
+                                            title={stat}
+                                            style={{
+                                              width: 12,
+                                              height: 12,
+                                              opacity: 0.85,
+                                              filter: highlight ? 'brightness(1.05) sepia(1) hue-rotate(10deg) saturate(4)' : undefined,
+                                            }}
+                                          />
+                                          <span>{formatShowcaseStat(stat, showcaseStats[stat] ?? 0)}</span>
+                                          {idx < SHOWCASE_STAT_KEYS.length - 1 && <span>·</span>}
+                                        </span>
+                                      )
+                                    })}
+                                  </span>
+                                </Text>
+                              )}
+                              <Text style={{ fontSize: 12, color: token.colorTextSecondary }}>
+                                {relicIds.length} relic{relicIds.length !== 1 ? 's' : ''} · {build.name || `Build ${index + 1}`}
+                              </Text>
+                            </Flex>
+                          </Flex>
                         )}
+
+                        <Flex wrap="wrap" gap={8}>
+                          {renderRelicSlots(
+                            relics,
+                            (relic) => {
+                              const slot = getSlotIndex(relic.part)
+                              openBuildEditor(index, slot >= 0 ? slot : undefined, getRelicUid(relic))
+                            },
+                          )}
+                        </Flex>
                       </Flex>
                     )}
                   </div>

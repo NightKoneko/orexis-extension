@@ -1,6 +1,53 @@
 import type { Character, Relic, OptimizerState, OptimizerStore } from './types'
 import { deriveAssetBasePath } from './constants'
 
+function ensureArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') return Object.values(value as Record<string, T>)
+  return []
+}
+
+function normalizeBuilds(value: unknown): Character['builds'] {
+  const builds = ensureArray<Record<string, unknown>>(value)
+  return builds
+    .filter((b) => b && typeof b === 'object')
+    .map((b, idx) => ({
+      name: typeof b.name === 'string' && b.name.length > 0 ? b.name : `Build ${idx + 1}`,
+      ...b,
+    }))
+}
+
+function normalizeEquipped(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') return {}
+
+  const out: Record<string, string> = {}
+  for (const [slot, relicId] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof relicId === 'string' && relicId.length > 0) out[slot] = relicId
+  }
+  return out
+}
+
+function normalizeCharacter(value: unknown): Character | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as Record<string, unknown>
+  const id = typeof raw.id === 'string' ? raw.id : null
+  if (!id) return null
+
+  return {
+    ...(raw as Character),
+    id,
+    name: typeof raw.name === 'string' ? raw.name : undefined,
+    builds: normalizeBuilds(raw.builds),
+    equipped: normalizeEquipped(raw.equipped),
+  }
+}
+
+function normalizeCharacters(value: unknown): Character[] {
+  return ensureArray<unknown>(value)
+    .map((c) => normalizeCharacter(c))
+    .filter((c): c is Character => c != null)
+}
+
 export function getStore(): OptimizerStore | null {
   return window.store ?? null
 }
@@ -199,8 +246,8 @@ export function getOptimizerState(): OptimizerState | null {
     const storeState = getStoreState()
     const db = getDB()
 
-    const characters = db?.getCharacters?.() ?? storeState?.characters ?? []
-    const relics = db?.getRelics?.() ?? storeState?.relics ?? []
+    const characters = normalizeCharacters(db?.getCharacters?.() ?? storeState?.characters)
+    const relics = ensureArray<Relic>(db?.getRelics?.() ?? storeState?.relics)
     const relicsById = storeState?.relicsById ?? {}
 
     return {
@@ -217,7 +264,14 @@ export function getOptimizerState(): OptimizerState | null {
   // ? 
   try {
     const raw = localStorage.getItem('state')
-    if (raw) return JSON.parse(raw) as OptimizerState
+    if (raw) {
+      const parsed = JSON.parse(raw) as OptimizerState
+      return {
+        ...parsed,
+        characters: normalizeCharacters(parsed.characters),
+        relics: ensureArray<Relic>(parsed.relics),
+      }
+    }
   } catch { /* ignore */ }
 
   return null

@@ -20,72 +20,16 @@ import {
 } from '../site-api'
 import { applyLoadout, checkBackendStatus } from '../utils/bridge'
 import { getRelicUid, getRelicImageUrl, sortRelicsBySlot, getSlotIndex } from '../utils/relics'
+import { ELEMENT_TO_DMG_TYPE, SHOWCASE_STAT_KEYS, formatShowcaseStat, buildRelicsByPart } from '../utils/showcase'
 import { RelicCard } from './RelicCard'
 import { BuildEditor } from './BuildEditor'
-import { getShowcaseStats, type BasicStatsObject, type SingleRelicByPart } from '../getShowcaseStats'
+import { getShowcaseStats, type BasicStatsObject } from '../getShowcaseStats'
 
 const { Text, Title } = Typography
 
 const PATHS = ['Abundance', 'Destruction', 'Erudition', 'Harmony', 'Hunt', 'Nihility', 'Preservation', 'Remembrance'] as const
 const ELEMENTS = ['Physical', 'Fire', 'Ice', 'Lightning', 'Wind', 'Quantum', 'Imaginary'] as const
 const RELIC_ROW_GAP = 8
-const ELEMENT_TO_DMG_TYPE: Record<string, string> = {
-  Physical: 'Physical DMG Boost',
-  Fire: 'Fire DMG Boost',
-  Ice: 'Ice DMG Boost',
-  Lightning: 'Lightning DMG Boost',
-  Wind: 'Wind DMG Boost',
-  Quantum: 'Quantum DMG Boost',
-  Imaginary: 'Imaginary DMG Boost',
-}
-
-const SHOWCASE_STAT_KEYS = [
-  'HP',
-  'ATK',
-  'DEF',
-  'SPD',
-  'CRIT Rate',
-  'CRIT DMG',
-  'Effect Hit Rate',
-  'Effect RES',
-  'Break Effect',
-] as const
-
-const SHOWCASE_PERCENT_STATS = new Set<string>([
-  'CRIT Rate',
-  'CRIT DMG',
-  'Effect Hit Rate',
-  'Effect RES',
-  'Break Effect',
-])
-
-function formatShowcaseStat(stat: string, value: number): string {
-  if (SHOWCASE_PERCENT_STATS.has(stat)) {
-    return `${(value * 100).toFixed(2)}%`
-  }
-  if (stat === 'SPD') {
-    return value.toFixed(1)
-  }
-  return Math.round(value).toString()
-}
-
-function buildRelicsByPart(relics: Relic[]): SingleRelicByPart {
-  const byPart: SingleRelicByPart = {
-    Head: null,
-    Hands: null,
-    Body: null,
-    Feet: null,
-    PlanarSphere: null,
-    LinkRope: null,
-  }
-  for (const relic of relics) {
-    if (!relic?.part) continue
-    if (relic.part in byPart) {
-      byPart[relic.part] = relic
-    }
-  }
-  return byPart
-}
 
 function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
   if (a.length !== b.length) return false
