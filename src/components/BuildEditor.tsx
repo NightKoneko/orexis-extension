@@ -248,10 +248,18 @@ export function BuildEditor({ open, onClose, characterId, buildIndex = -1, initi
     }
 
     const builds = targetChar.builds ?? []
+    const nonNullIds = selectedRelicIds.filter(Boolean) as string[]
+    const equippedMap: Record<string, string> = {}
+    SLOT_ORDER.forEach((slot, index) => {
+      const id = selectedRelicIds[index]
+      if (id) equippedMap[slot] = id
+    })
     const newBuild: Build = {
       name: buildName.trim() || 'New Build',
-      build: selectedRelicIds.filter(Boolean) as string[],
-      relicIds: selectedRelicIds.filter(Boolean) as string[],
+      build: nonNullIds,
+      relicIds: nonNullIds,
+      equipped: equippedMap,
+      optimizerMetadata: null,
     }
 
     if (buildIndex >= 0 && buildIndex < builds.length) {

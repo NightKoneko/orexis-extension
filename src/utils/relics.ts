@@ -48,7 +48,8 @@ export function getRelicImageUrl(relic: Relic): string {
 }
 
 // c
-export function getRelicUid(relic: Relic): string | undefined {
+export function getRelicUid(relic: Pick<Relic, 'uid' | 'id'> | null | undefined): string | undefined {
+  if (!relic) return undefined
   return relic.uid ?? relic.id
 }
 

@@ -558,10 +558,24 @@ export function TeamLoadouts({ onOpenCharacterBuilds }: TeamLoadoutsProps) {
 
         const characterName = resolveCharacterName(state, character)
         const buildLabel = build?.name ?? 'Equipped'
+        const relicUids = finalRelicIds
+          .map((id) => {
+            const relic = getRelicById(id)
+            const resolved = getRelicUid(relic) ?? id
+            const uid = Number(resolved)
+            return Number.isInteger(uid) && uid > 0 ? uid : null
+          })
+          .filter((uid): uid is number => uid != null)
+
+        if (!relicUids.length) {
+          message.warning(`No valid game relic UIDs for ${characterName}`)
+          continue
+        }
+
         const loadout = {
           avatar_id: Number(character.id),
           name: `${characterName} - ${buildLabel}`,
-          relic_uids: finalRelicIds.map(Number),
+          relic_uids: relicUids,
         }
 
         try {

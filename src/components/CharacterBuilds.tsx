@@ -212,6 +212,8 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
         name,
         build: relicIds,
         relicIds,
+        equipped: Object.fromEntries(SLOT_ORDER.map((slot) => [slot, character.equipped?.[slot]]).filter(([, v]) => v)) as Record<string, string>,
+        optimizerMetadata: null,
       }
 
       const db = window.DB
@@ -299,10 +301,24 @@ export function CharacterBuilds({ externalSelectedCharacterId, onSelectCharacter
       return
     }
 
+    const relicUids = relicIds
+      .map((id) => {
+        const relic = getRelicById(id)
+        const resolved = getRelicUid(relic) ?? id
+        const uid = Number(resolved)
+        return Number.isInteger(uid) && uid > 0 ? uid : null
+      })
+      .filter((uid): uid is number => uid != null)
+
+    if (!relicUids.length) {
+      message.error('Build relic IDs are not valid game UIDs')
+      return
+    }
+
     const loadout = {
       avatar_id: Number(character.id),
       name: `${resolveCharacterName(state, character)} - ${build.name || `Build ${buildIndex + 1}`}`,
-      relic_uids: relicIds.map(Number),
+      relic_uids: relicUids,
     }
 
     try {

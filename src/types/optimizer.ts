@@ -23,15 +23,34 @@ export interface Build {
 export function getBuildRelicIds(build: Build | null | undefined): string[] {
   if (!build) return []
 
-  const source = build.relicIds ?? build.build ?? []
-
-  if (Array.isArray(source)) {
-    return source.filter((id): id is string => typeof id === 'string' && id.length > 0)
+  function extractIds(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value
+        .map((id) => {
+          if (typeof id === 'string') return id.trim()
+          if (typeof id === 'number' && Number.isFinite(id)) return String(id)
+          return ''
+        })
+        .filter((id): id is string => id.length > 0)
+    }
+    if (value && typeof value === 'object') {
+      return Object.values(value as Record<string, unknown>)
+        .map((id) => {
+          if (typeof id === 'string') return id.trim()
+          if (typeof id === 'number' && Number.isFinite(id)) return String(id)
+          return ''
+        })
+        .filter((id): id is string => id.length > 0)
+    }
+    return []
   }
 
-  if (source && typeof source === 'object') {
-    return Object.values(source as Record<string, unknown>)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+  if (build.relicIds !== undefined) return extractIds(build.relicIds)
+  if (build.build !== undefined) return extractIds(build.build)
+
+  const equipped = build.equipped as unknown
+  if (equipped && typeof equipped === 'object' && !Array.isArray(equipped)) {
+    return extractIds(equipped)
   }
 
   return []

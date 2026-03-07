@@ -34,7 +34,7 @@ function normalizeCharacter(value: unknown): Character | null {
   if (!id) return null
 
   return {
-    ...(raw as Character),
+    ...(raw as unknown as Character),
     id,
     name: typeof raw.name === 'string' ? raw.name : undefined,
     builds: normalizeBuilds(raw.builds),
@@ -232,11 +232,19 @@ export function findCharacterByIdFromDB(characterId: string): Character | undefi
 
 export function getRelicById(relicId: string | undefined): Relic | undefined {
   if (!relicId) return undefined
+  const target = String(relicId)
   try {
-    return getDB()?.getRelicById?.(relicId)
+    const fromDb = getDB()?.getRelicById?.(target)
+    if (fromDb) return fromDb
   } catch { /* ignore */ }
   try {
-    return getStoreState()?.relicsById?.[relicId]
+    const fromStoreById = getStoreState()?.relicsById?.[target]
+    if (fromStoreById) return fromStoreById
+  } catch { /* ignore */ }
+
+  try {
+    const relics = getDB()?.getRelics?.() ?? ensureArray<Relic>(getStoreState()?.relics)
+    return relics.find((relic) => String(relic.id ?? '') === target || String(relic.uid ?? '') === target)
   } catch { /* ignore */ }
   return undefined
 }
