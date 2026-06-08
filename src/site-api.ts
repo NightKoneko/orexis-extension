@@ -52,14 +52,74 @@ export function getStore(): OptimizerStore | null {
   return window.store ?? null
 }
 
-export function getStoreState(): (OptimizerState & { activeKey: string; setActiveKey: (k: string) => void }) | null {
+let _cachedRawState: string | null = null
+let _cachedParsedState: (OptimizerState & {
+  activeKey: string
+  setActiveKey: (k: string) => void
+}) | null = null
+
+let _cachedOptimizerState: OptimizerState | null = null
+
+function getParsedState() {
   try {
-    return window.store?.getState?.() ?? null
+    const raw = localStorage.getItem('state')
+    if (!raw) return null
+
+    if (raw === _cachedRawState) {
+      return _cachedParsedState
+    }
+
+    _cachedRawState = raw
+    _cachedParsedState = JSON.parse(raw)
+
+    // Invalidate normalized cache when state changes
+    _cachedOptimizerState = null
+
+    return _cachedParsedState
   } catch {
     return null
   }
 }
 
+export function getStoreState(): (OptimizerState & {
+  activeKey: string
+  setActiveKey: (k: string) => void
+}) | null {
+  return getParsedState()
+}
+
+export function getOptimizerState(): OptimizerState | null {
+  if (_cachedOptimizerState) {
+    return _cachedOptimizerState
+  }
+
+  try {
+    const storeState = getParsedState()
+    const db = getDB()
+
+    const characters = normalizeCharacters(
+      db?.getCharacters?.() ?? storeState?.characters
+    )
+
+    const relics = ensureArray<Relic>(
+      db?.getRelics?.() ?? storeState?.relics
+    )
+
+    _cachedOptimizerState = {
+      characters,
+      relics,
+      relicsById: storeState?.relicsById ?? {},
+      globalThemeConfig: storeState?.globalThemeConfig,
+      metadata: storeState?.metadata,
+      optimizerTabFocusCharacter: storeState?.optimizerTabFocusCharacter,
+      optimizerBuild: storeState?.optimizerBuild ?? {},
+    }
+
+    return _cachedOptimizerState
+  } catch {
+    return null
+  }
+}
 export function getDB() {
   return window.DB ?? null
 }
@@ -247,42 +307,6 @@ export function getRelicById(relicId: string | undefined): Relic | undefined {
     return relics.find((relic) => String(relic.id ?? '') === target || String(relic.uid ?? '') === target)
   } catch { /* ignore */ }
   return undefined
-}
-
-export function getOptimizerState(): OptimizerState | null {
-  try {
-    const storeState = getStoreState()
-    const db = getDB()
-
-    const characters = normalizeCharacters(db?.getCharacters?.() ?? storeState?.characters)
-    const relics = ensureArray<Relic>(db?.getRelics?.() ?? storeState?.relics)
-    const relicsById = storeState?.relicsById ?? {}
-
-    return {
-      characters,
-      relics,
-      relicsById,
-      globalThemeConfig: storeState?.globalThemeConfig,
-      metadata: storeState?.metadata,
-      optimizerTabFocusCharacter: storeState?.optimizerTabFocusCharacter,
-      optimizerBuild: storeState?.optimizerBuild ?? {}
-    }
-  } catch { /* ignore */ }
-
-  // ? 
-  try {
-    const raw = localStorage.getItem('state')
-    if (raw) {
-      const parsed = JSON.parse(raw) as OptimizerState
-      return {
-        ...parsed,
-        characters: normalizeCharacters(parsed.characters),
-        relics: ensureArray<Relic>(parsed.relics),
-      }
-    }
-  } catch { /* ignore */ }
-
-  return null
 }
 
 let _setIdCache: Record<string, string> | null = null
