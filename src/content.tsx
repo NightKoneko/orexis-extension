@@ -206,11 +206,9 @@ function createOrexisTabContainer(): HTMLDivElement {
   container.id = OREXIS_PAGE_KEY
   container.style.cssText = [
     'display:none',
-    'position:absolute',
-    'inset:0',
+    'position:relative',
     'width:100%',
     'min-height:100%',
-    'z-index:1',
   ].join(';')
   return container
 }
@@ -223,12 +221,51 @@ function updateOrexisTabVisibility() {
   const container = document.getElementById(OREXIS_PAGE_KEY)
   if (!container) return
 
-  const isOrexisActive = Boolean(window.store?.getState?.().activeKey === OREXIS_PAGE_KEY || isOrexisRouteActive())
+  const isOrexisActive = Boolean(
+    window.store?.getState?.().activeKey === OREXIS_PAGE_KEY ||
+    isOrexisRouteActive()
+  )
+
   container.style.display = isOrexisActive ? 'block' : 'none'
 
-  const menuItem = document.querySelector('.orexis-menu-item')
-  if (menuItem) {
-    menuItem.classList.toggle('ant-menu-item-selected', isOrexisActive)
+  const host = container.parentElement
+  if (host) {
+    for (const child of Array.from(host.children)) {
+      if (!(child instanceof HTMLElement) || child === container) continue
+
+      if (isOrexisActive) {
+        if (!child.dataset.orexisPrevDisplay) {
+          child.dataset.orexisPrevDisplay = child.style.display
+        }
+        child.style.display = 'none'
+        child.setAttribute('aria-hidden', 'true')
+      } else if ('orexisPrevDisplay' in child.dataset) {
+        child.style.display = child.dataset.orexisPrevDisplay || ''
+        delete child.dataset.orexisPrevDisplay
+        child.removeAttribute('aria-hidden')
+      }
+    }
+  }
+
+  // ---- Menu selection handling ----
+
+  const orexisItem = document.querySelector('.orexis-menu-item')
+
+  if (isOrexisActive) {
+    document
+      .querySelectorAll('.ant-menu-item-selected')
+      .forEach((el) => {
+        if (el !== orexisItem) {
+          el.classList.remove('ant-menu-item-selected')
+        }
+      })
+  }
+
+  if (orexisItem) {
+    orexisItem.classList.toggle(
+      'ant-menu-item-selected',
+      isOrexisActive
+    )
   }
 }
 
@@ -318,17 +355,23 @@ function injectMenuItem() {
   menuItem.addEventListener('mouseleave', () => {
     menuItem.style.background = 'transparent'
   })
-  menuItem.addEventListener('click', (e) => {
-    e.stopPropagation()
-    const store = window.store
-    if (store?.getState?.().setActiveKey) {
-      store.getState().setActiveKey(OREXIS_PAGE_KEY)
-      return
-    }
+menuItem.addEventListener('click', (e) => {
+  e.stopPropagation()
 
-    activateOrexisTab()
-  })
+  const store = window.store
 
+  if (store?.getState?.().setActiveKey) {
+    store.getState().setActiveKey(OREXIS_PAGE_KEY)
+
+    requestAnimationFrame(() => {
+      updateOrexisTabVisibility()
+    })
+
+    return
+  }
+
+  activateOrexisTab()
+})
   sidebarHost.prepend(menuItem)
 
   return true
@@ -350,6 +393,7 @@ function injectTabContent(container: HTMLDivElement) {
   }
 
   tabsContainer.appendChild(container)
+  updateOrexisTabVisibility()
   return true
 }
 
@@ -376,26 +420,39 @@ function injectOptimizerEquip() {
   sidebarDiv.appendChild(node)
   return true
 }
-
 function setupActiveKeyWatcher(container: HTMLDivElement) {
   const syncVisibility = () => {
-    const isOrexisActive = Boolean(window.store?.getState?.().activeKey === OREXIS_PAGE_KEY || isOrexisRouteActive())
-    container.style.display = isOrexisActive ? 'block' : 'none'
+    // Single source of truth
+    updateOrexisTabVisibility()
 
-    const menuItem = document.querySelector('.orexis-menu-item')
+    const isOrexisActive = Boolean(
+      window.store?.getState?.().activeKey === OREXIS_PAGE_KEY ||
+      isOrexisRouteActive()
+    )
+
+    const menuItem = document.querySelector('.orexis-menu-item') as HTMLElement | null
+
     if (menuItem) {
       menuItem.setAttribute('data-active', isOrexisActive ? 'true' : '')
-      menuItem.style.background = isOrexisActive ? 'linear-gradient(90deg, hsla(215, 82%, 62%, 0.18), hsla(215, 82%, 62%, 0.06))' : 'transparent'
+      menuItem.style.background = isOrexisActive
+        ? 'linear-gradient(90deg, hsla(215, 82%, 62%, 0.18), hsla(215, 82%, 62%, 0.06))'
+        : 'transparent'
     }
   }
 
   if (window.store?.subscribe) {
-    const unsubscribe = window.store.subscribe(syncVisibility)
+    const unsubscribe = window.store.subscribe(() => {
+      requestAnimationFrame(syncVisibility)
+    })
+
     syncVisibility()
     return unsubscribe
   }
 
-  const onHashChange = () => syncVisibility()
+  const onHashChange = () => {
+    requestAnimationFrame(syncVisibility)
+  }
+
   window.addEventListener('hashchange', onHashChange)
   syncVisibility()
 
