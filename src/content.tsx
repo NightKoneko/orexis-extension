@@ -19,6 +19,7 @@ if (!window.__hsrLightConeRanks) {
 }
 
 const OREXIS_CONNECTION_ID = 'orexis-connection-indicator'
+const OREXIS_HASH = '#orexis'
 
 export const MEOW = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <path fill-rule="evenodd" clip-rule="evenodd" d="M12.0196 14.9374C11.7284 14.9374 11.4307 14.9818 11.1784 15.0796C11.0546 15.1275 10.9032 15.2031 10.7699 15.3252C10.6361 15.4479 10.4632 15.6749 10.4632 15.9999C10.4632 16.3249 10.6361 16.5519 10.7699 16.6745C10.9032 16.7967 11.0546 16.8722 11.1784 16.9202C11.4307 17.018 11.7284 17.0624 12.0196 17.0624C12.3109 17.0624 12.6085 17.018 12.8609 16.9202C12.9846 16.8722 13.136 16.7967 13.2693 16.6745C13.4032 16.5519 13.5761 16.3249 13.5761 15.9999C13.5761 15.6749 13.4032 15.4479 13.2693 15.3252C13.136 15.2031 12.9846 15.1275 12.8609 15.0796C12.6085 14.9818 12.3109 14.9374 12.0196 14.9374Z"></path>
@@ -28,19 +29,27 @@ export const MEOW = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://
 </svg>`
 
 function waitForStore(timeout = STORE_WAIT_TIMEOUT): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const start = Date.now()
+
     function check() {
-      if (window.store && typeof window.store.getState === 'function') {
+      if (
+        window.store && typeof window.store.getState === 'function'
+        || (window as Window & { __HSR_DEBUG?: unknown }).__HSR_DEBUG
+        || window.DB
+      ) {
         resolve()
         return
       }
+
       if (Date.now() - start > timeout) {
-        reject(new Error('Timeout waiting for window.store'))
+        resolve()
         return
       }
+
       setTimeout(check, 100)
     }
+
     check()
   })
 }
@@ -73,15 +82,14 @@ function queryFirst(selectors: readonly string[]): Element | null {
 }
 
 function findHeaderBadgeContainer(): HTMLElement | null {
-  const header = document.querySelector('header.ant-layout-header')
+  const header = document.querySelector('header')
   if (!header) return null
 
-  const badgeImg = header.querySelector(
-    'img[src*="badgediscord"], img[src*="badgegithub"], img[src*="badgekofi"]'
-  )
-  const badgeAnchor = badgeImg?.closest('a')
-  const container = badgeAnchor?.parentElement ?? header
-  return container as HTMLElement
+  const headerInner = header.firstElementChild as HTMLElement | null
+  if (!headerInner) return header as HTMLElement
+
+  const rightCluster = headerInner.lastElementChild as HTMLElement | null
+  return rightCluster ?? headerInner
 }
 
 function startConnectionIndicator(indicator: HTMLDivElement) {
@@ -128,30 +136,11 @@ function injectConnectionIndicator(): boolean {
   const indicator = document.createElement('div') as HTMLDivElement
   indicator.id = OREXIS_CONNECTION_ID
 
-  function findLanguageSelector(): Element | null {
-    const header = document.querySelector('header.ant-layout-header')
-    if (!header) return null
-    const langSelectors = [
-      '[data-role="language"]',
-      '.language-selector',
-      '.lang-select',
-      'select[name="language"]',
-      'button[aria-label*="language"]',
-      '.ant-select',
-    ]
-    for (const s of langSelectors) {
-      const el = header.querySelector(s)
-      if (el) return el
-    }
-    return null
-  }
+  const header = document.querySelector('header')
+  const headerInner = header?.firstElementChild as HTMLElement | null
+  const targetCluster = (headerInner?.lastElementChild as HTMLElement | null) ?? headerInner ?? header
 
-  const langEl = findLanguageSelector()
-
-  const selectorRoot = langEl
-    ? (langEl.matches('.ant-select') ? langEl : langEl.closest('.ant-select'))
-    : null
-  const selectorVisual = selectorRoot?.querySelector('.ant-select-selector') ?? selectorRoot ?? langEl
+  const selectorVisual = targetCluster ?? null
   const selectorStyle = selectorVisual ? getComputedStyle(selectorVisual) : null
 
   const baseBackground = selectorStyle?.backgroundColor && selectorStyle.backgroundColor !== 'rgba(0, 0, 0, 0)'
@@ -196,9 +185,9 @@ function injectConnectionIndicator(): boolean {
     indicator.style.filter = 'none'
   })
 
-  if (langEl && langEl.parentElement) {
-    indicator.style.marginRight = '8px'
-    langEl.parentElement.insertBefore(indicator, langEl)
+  if (targetCluster) {
+    indicator.style.marginLeft = '8px'
+    targetCluster.appendChild(indicator)
   } else {
     const firstBadge = container.querySelector('a[href*="ko-fi"], a[href*="github"], a[href*="discord"]')
     if (firstBadge) {
@@ -215,8 +204,106 @@ function injectConnectionIndicator(): boolean {
 function createOrexisTabContainer(): HTMLDivElement {
   const container = document.createElement('div')
   container.id = OREXIS_PAGE_KEY
-  container.style.display = 'none'
+  container.style.cssText = [
+    'display:none',
+    'position:relative',
+    'width:100%',
+    'min-height:100%',
+  ].join(';')
   return container
+}
+
+function isOrexisRouteActive(): boolean {
+  return window.location.hash.split('?')[0] === OREXIS_HASH
+}
+
+function updateOrexisTabVisibility() {
+  const container = document.getElementById(OREXIS_PAGE_KEY)
+  if (!container) return
+
+  const isOrexisActive = Boolean(
+    window.store?.getState?.().activeKey === OREXIS_PAGE_KEY ||
+    isOrexisRouteActive()
+  )
+
+  container.style.display = isOrexisActive ? 'block' : 'none'
+
+  const host = container.parentElement
+  if (host) {
+    for (const child of Array.from(host.children)) {
+      if (!(child instanceof HTMLElement) || child === container) continue
+
+      if (isOrexisActive) {
+        if (!child.dataset.orexisPrevDisplay) {
+          child.dataset.orexisPrevDisplay = child.style.display
+        }
+        child.style.display = 'none'
+        child.setAttribute('aria-hidden', 'true')
+      } else if ('orexisPrevDisplay' in child.dataset) {
+        child.style.display = child.dataset.orexisPrevDisplay || ''
+        delete child.dataset.orexisPrevDisplay
+        child.removeAttribute('aria-hidden')
+      }
+    }
+  }
+
+  // ---- Menu selection handling ----
+
+  const orexisItem = document.querySelector('.orexis-menu-item')
+
+  if (isOrexisActive) {
+    document
+      .querySelectorAll('.ant-menu-item-selected')
+      .forEach((el) => {
+        if (el !== orexisItem) {
+          el.classList.remove('ant-menu-item-selected')
+        }
+      })
+  }
+
+  if (orexisItem) {
+    orexisItem.classList.toggle(
+      'ant-menu-item-selected',
+      isOrexisActive
+    )
+  }
+}
+
+function activateOrexisTab() {
+  if (isOrexisRouteActive()) {
+    updateOrexisTabVisibility()
+    return
+  }
+
+  window.location.hash = OREXIS_HASH
+}
+
+function retryUntilInjected(label: string, inject: () => boolean, timeoutMs = 10_000) {
+  const startedAt = Date.now()
+  const root = document.documentElement ?? document.body
+  if (!root) return
+
+  const tryInject = () => {
+    if (inject()) return true
+    if (Date.now() - startedAt > timeoutMs) {
+      console.warn(`[Orexis] Timed out waiting for ${label}`)
+      return true
+    }
+    return false
+  }
+
+  if (tryInject()) return
+
+  const observer = new MutationObserver(() => {
+    if (tryInject()) {
+      observer.disconnect()
+    }
+  })
+
+  observer.observe(root, { childList: true, subtree: true })
+  window.setTimeout(() => {
+    observer.disconnect()
+  }, timeoutMs)
 }
 
 function renderOrexisApp(container: HTMLElement) {
@@ -229,63 +316,63 @@ function renderOrexisApp(container: HTMLElement) {
 }
 
 function injectMenuItem() {
-  const menu = queryFirst(MENU_SELECTORS)
-  if (!menu) {
-    console.warn('[Orexis] Menu not found')
+  const sidebarHost = document.querySelector('.layout-sider-scroll') as HTMLElement | null
+  if (!sidebarHost) {
     return false
   }
 
-  const submenus = menu.querySelectorAll(SUBMENU_SELECTOR)
-  const toolsSubmenu = submenus.length > 0 ? submenus[0] : null
+  const existingTrigger = sidebarHost.querySelector('.orexis-menu-item') as HTMLElement | null
+  if (existingTrigger) return true
 
-  const toolsMenuList = toolsSubmenu?.querySelector('ul[class*="ant-menu"]')
-    ?? toolsSubmenu?.querySelector('[role="group"]')
-
-  if (!toolsMenuList) {
-    console.warn('[Orexis] Tools submenu list not found, falling back to top-level')
-  }
-
-  const menuItem = document.createElement('li')
-  menuItem.className = 'ant-menu-item orexis-menu-item'
-  menuItem.setAttribute('role', 'menuitem')
+  const menuItem = document.createElement('button')
+  menuItem.type = 'button'
+  menuItem.className = 'orexis-menu-item'
   menuItem.setAttribute('data-menu-id', OREXIS_PAGE_KEY)
-
-  const siblingItem = toolsMenuList?.querySelector('li.ant-menu-item') as HTMLElement | null
-  const siblingPadding = siblingItem ? getComputedStyle(siblingItem).paddingLeft : '36px'
-
-  menuItem.style.paddingLeft = siblingPadding
+  menuItem.style.cssText = [
+    'display:flex',
+    'align-items:center',
+    'gap:10px',
+    'width:100%',
+    'padding:8px 14px',
+    'margin:0',
+    'border:0',
+    'border-radius:3px',
+    'background:transparent',
+    'color:inherit',
+    'text-align:left',
+    'cursor:pointer',
+    'box-sizing:border-box',
+    'font:inherit',
+  ].join(';')
   menuItem.innerHTML = `
-    <span class="ant-menu-title-content">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span role="img" style="display:inline-flex;width:14px;height:14px;font-size:14px;line-height:1">
-          ${MEOW}
-        </span>
-        Orexis
-      </div>
-    </span>
+    <span style="display:inline-flex;width:28px;height:28px;min-width:28px;border-radius:6px;background:hsla(215, 30%, 50%, 0.15);align-items:center;justify-content:center;color:var(--text-muted);flex:0 0 auto;">${MEOW}</span>
+    <span style="font-size:14px;font-weight:400;white-space:nowrap;line-height:1;color:rgba(255, 255, 255, 0.63);">Orexis</span>
   `
 
-  menuItem.addEventListener('click', (e) => {
-    e.stopPropagation()
+  menuItem.addEventListener('mouseenter', () => {
+    menuItem.style.background = 'hsla(215, 82%, 62%, 0.08)'
+  })
+  menuItem.addEventListener('mouseleave', () => {
+    menuItem.style.background = 'transparent'
+  })
+menuItem.addEventListener('click', (e) => {
+  e.stopPropagation()
 
-    menu.querySelectorAll('.ant-menu-item-selected').forEach(el => {
-      el.classList.remove('ant-menu-item-selected')
+  const store = window.store
+
+  if (store?.getState?.().setActiveKey) {
+    store.getState().setActiveKey(OREXIS_PAGE_KEY)
+
+    requestAnimationFrame(() => {
+      updateOrexisTabVisibility()
     })
 
-    menuItem.classList.add('ant-menu-item-selected')
-    window.store?.getState().setActiveKey(OREXIS_PAGE_KEY)
-  })
-
-  if (toolsMenuList) {
-    toolsMenuList.appendChild(menuItem)
-  } else {
-    const firstSubmenu = submenus[0]
-    if (firstSubmenu) {
-      menu.insertBefore(menuItem, firstSubmenu)
-    } else {
-      menu.appendChild(menuItem)
-    }
+    return
   }
+
+  activateOrexisTab()
+})
+  sidebarHost.prepend(menuItem)
 
   return true
 }
@@ -301,7 +388,12 @@ function injectTabContent(container: HTMLDivElement) {
     tabsContainer = tabsContainer.parentElement
   }
 
+  if (tabsContainer instanceof HTMLElement && getComputedStyle(tabsContainer).position === 'static') {
+    tabsContainer.style.position = 'relative'
+  }
+
   tabsContainer.appendChild(container)
+  updateOrexisTabVisibility()
   return true
 }
 
@@ -328,22 +420,45 @@ function injectOptimizerEquip() {
   sidebarDiv.appendChild(node)
   return true
 }
-
 function setupActiveKeyWatcher(container: HTMLDivElement) {
-  if (!window.store) return () => { /* meow */ }
+  const syncVisibility = () => {
+    // Single source of truth
+    updateOrexisTabVisibility()
 
-  const unsubscribe = window.store.subscribe((state: { activeKey: string }) => {
-    const isOrexisActive = state.activeKey === OREXIS_PAGE_KEY
+    const isOrexisActive = Boolean(
+      window.store?.getState?.().activeKey === OREXIS_PAGE_KEY ||
+      isOrexisRouteActive()
+    )
 
-    container.style.display = isOrexisActive ? 'contents' : 'none'
+    const menuItem = document.querySelector('.orexis-menu-item') as HTMLElement | null
 
-    const menuItem = document.querySelector('.orexis-menu-item')
     if (menuItem) {
-      menuItem.classList.toggle('ant-menu-item-selected', isOrexisActive)
+      menuItem.setAttribute('data-active', isOrexisActive ? 'true' : '')
+      menuItem.style.background = isOrexisActive
+        ? 'linear-gradient(90deg, hsla(215, 82%, 62%, 0.18), hsla(215, 82%, 62%, 0.06))'
+        : 'transparent'
     }
-  })
+  }
 
-  return unsubscribe
+  if (window.store?.subscribe) {
+    const unsubscribe = window.store.subscribe(() => {
+      requestAnimationFrame(syncVisibility)
+    })
+
+    syncVisibility()
+    return unsubscribe
+  }
+
+  const onHashChange = () => {
+    requestAnimationFrame(syncVisibility)
+  }
+
+  window.addEventListener('hashchange', onHashChange)
+  syncVisibility()
+
+  return () => {
+    window.removeEventListener('hashchange', onHashChange)
+  }
 }
 
 async function injectOrexis() {
@@ -351,7 +466,11 @@ async function injectOrexis() {
     console.log('[Orexis] Waiting for site to initialize...')
 
     await waitForStore()
-    console.log('[Orexis] Store ready')
+    if (window.store) {
+      console.log('[Orexis] Store ready')
+    } else {
+      console.log('[Orexis] Store not available, using hash-based tab fallback')
+    }
 
     await waitForElement(CONTENT_SELECTORS)
     console.log('[Orexis] Layout ready')
@@ -360,13 +479,8 @@ async function injectOrexis() {
 
     const container = createOrexisTabContainer()
 
-    if (!injectMenuItem()) {
-      console.error('[Orexis] Failed to inject menu item')
-    }
-
-    if (!injectConnectionIndicator()) {
-      console.warn('[Orexis] Failed to inject connection indicator')
-    }
+    retryUntilInjected('sidebar trigger', injectMenuItem)
+    retryUntilInjected('connection indicator', injectConnectionIndicator)
 
     if (!injectTabContent(container)) {
       console.error('[Orexis] Failed to inject tab content')
@@ -380,6 +494,7 @@ async function injectOrexis() {
 
     renderOrexisApp(container)
     setupActiveKeyWatcher(container)
+    updateOrexisTabVisibility()
 
     console.log('[Orexis] Successfully injected')
   } catch (error) {
